@@ -1,0 +1,21 @@
+# Variables de entorno (contienen secretos)
+.env
+
+# Dependencias
+node_modules/
+**/node_modules/
+
+# Build frontend
+frontend/dist
+frontend/dist-ssr
+
+# Documentación interna
+guidelines/
+
+# Logs de prueba
+*.log
+logs-*.txt
+
+# OS
+.DS_Store
+Thumbs.db
