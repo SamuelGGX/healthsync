@@ -9,7 +9,10 @@ async function findAllWithLastVital() {
       v.bpm,
       v.spo2,
       v.temperature,
-      v.recorded_at AS last_reading
+      v.recorded_at         AS last_reading,
+      p.full_name           AS patient_name,
+      p.blood_type          AS patient_blood_type,
+      p.document_id         AS patient_document
     FROM beds b
     LEFT JOIN LATERAL (
       SELECT bpm, spo2, temperature, recorded_at
@@ -18,6 +21,8 @@ async function findAllWithLastVital() {
       ORDER BY recorded_at DESC
       LIMIT 1
     ) v ON true
+    LEFT JOIN bed_assignments ba ON ba.bed_id = b.id AND ba.ended_at IS NULL
+    LEFT JOIN patients p ON p.id = ba.patient_id
     ORDER BY b.id
   `);
   return rows;

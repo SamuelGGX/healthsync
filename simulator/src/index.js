@@ -1,14 +1,14 @@
 require('dotenv').config();
 const axios = require('axios');
 
-const BACKEND_URL  = process.env.BACKEND_URL  || 'http://localhost:3000';
-const INTERVAL_MS  = parseInt(process.env.SIM_INTERVAL_MS) || 1000;
+const BACKEND_URL = process.env.BACKEND_URL  || 'http://localhost:3000';
+const INTERVAL_MS = parseInt(process.env.SIM_INTERVAL_MS) || 1000;
 
 function randomBetween(min, max) {
   return parseFloat((Math.random() * (max - min) + min).toFixed(1));
 }
 
-function generateVital(bedId) {
+function generateNormal(bedId) {
   return {
     bed_id:      bedId,
     bpm:         randomBetween(60, 100),
@@ -37,12 +37,9 @@ async function run() {
 
   setInterval(async () => {
     for (const bedId of bedIds) {
-      const vital = generateVital(bedId);
-      try {
-        await axios.post(`${BACKEND_URL}/vitals`, vital);
-      } catch (err) {
-        console.error(`[SIM] Error sending bed ${bedId}:`, err.message);
-      }
+      axios.post(`${BACKEND_URL}/vitals`, generateNormal(bedId)).catch(err =>
+        console.error(`[SIM] Error bed ${bedId}:`, err.message)
+      );
     }
   }, INTERVAL_MS);
 }

@@ -1,16 +1,22 @@
 require('dotenv').config();
+const http   = require('http');
 const express = require('express');
 const cors    = require('cors');
 const pool    = require('./db');
+const { init: initIO } = require('./io');
 
-const app  = express();
-const PORT = process.env.BACKEND_PORT || 3000;
+const app    = express();
+const server = http.createServer(app);
+const PORT   = process.env.BACKEND_PORT || 3000;
+
+initIO(server);
 
 app.use(cors());
 app.use(express.json());
 
 app.use('/beds',   require('./routes/beds'));
 app.use('/vitals', require('./routes/vitals'));
+app.use('/alerts', require('./routes/alerts'));
 
 app.get('/health', async (req, res) => {
   try {
@@ -21,6 +27,6 @@ app.get('/health', async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`Backend running on port ${PORT}`);
 });
