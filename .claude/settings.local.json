@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\Carlos\\\\Desktop\\\\sabadin\\\\healthsync\" -Recurse -Directory)",
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "Bash(Sort-Object)",
+      "Bash(find \"c:\\\\Users\\\\Carlos\\\\Desktop\\\\sabadin\" -type d -name \"guideline*\" 2>/dev/null)",
+      "Read(//c/Users/Carlos/Desktop/sabadin/**)",
+      "Bash(find /mnt/c/Users/Carlos/Desktop/sabadin -name \"*.txt\" -o -name \"*.md\" 2>/dev/null | head -30)",
+      "Read(//mnt/c/Users/Carlos/Desktop/**)",
+      "Bash(find /mnt/c/Users/Carlos/Desktop -maxdepth 3 -name \"*guideline*\" -o -name \"*plan*\" -o -name \"*fase*\" 2>/dev/null | head -20)",
+      "Read(//mnt/c/Users/Carlos/**)",
+      "PowerShell([System.Environment]::GetFolderPath\\('Desktop'\\))"
+    ]
+  }
+}
