@@ -219,6 +219,17 @@ export default function Dashboard() {
       }))
     })
 
+    socket.on('bed_status', ({ bed_id, status }) => {
+      setBeds(prev => ({
+        ...prev,
+        [bed_id]: {
+          ...prev[bed_id],
+          // mapear el status 'active' de la BD a 'normal' para la UI
+          status: status === 'active' ? 'normal' : status,
+        },
+      }))
+    })
+
     return () => socket.disconnect()
   }, [])
 

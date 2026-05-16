@@ -203,7 +203,7 @@ function Sender() {
 
         {/* Action buttons */}
         {!streaming ? (
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             <button
               onClick={send}
               disabled={loading || !bedId}
@@ -218,6 +218,38 @@ function Sender() {
             >
               Transmitir 30s
             </button>
+            <div className="flex gap-2">
+              <button
+                onClick={async () => {
+                  if (!bedId) return
+                  setLoading(true)
+                  try {
+                    const r = await fetch(`${API_URL}/beds/${bedId}/disconnect`, { method: 'POST' })
+                    setResponse({ status: r.status, data: await r.json() })
+                  } catch (err) {
+                    setResponse({ error: err.message })
+                  } finally { setLoading(false) }
+                }}
+                className="w-full bg-red-600 text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-red-700 active:bg-red-800 disabled:opacity-50 disabled:cursor-not-allowed transition"
+              >
+                Desconectar
+              </button>
+              <button
+                onClick={async () => {
+                  if (!bedId) return
+                  setLoading(true)
+                  try {
+                    const r = await fetch(`${API_URL}/beds/${bedId}/reconnect`, { method: 'POST' })
+                    setResponse({ status: r.status, data: await r.json() })
+                  } catch (err) {
+                    setResponse({ error: err.message })
+                  } finally { setLoading(false) }
+                }}
+                className="w-full bg-emerald-600 text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-emerald-700 active:bg-emerald-800 disabled:opacity-50 disabled:cursor-not-allowed transition"
+              >
+                Reconectar
+              </button>
+            </div>
           </div>
         ) : (
           <div className="space-y-2.5">

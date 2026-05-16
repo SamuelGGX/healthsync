@@ -1,6 +1,7 @@
 const vitalsRepository     = require('../repositories/vitals.repository');
 const alertsRepository     = require('../repositories/alerts.repository');
 const sensorLogsRepository = require('../repositories/sensor_logs.repository');
+const pool                = require('../db');
 const { validatePhysicalRange, detectAnomalies } = require('../services/anomaly');
 
 function parseNumeric(value) {
@@ -53,7 +54,21 @@ async function create(req, res) {
   const io = req.app.get('io');
 
   try {
+    // if the bed was manually disconnected, ignore emitting updates for it
+    const { rows: bedRows } = await pool.query('SELECT manual_override FROM beds WHERE id = $1', [bedIdNum]);
+    const manualOverride = bedRows[0]?.manual_override ?? false;
+
     const inserted  = await vitalsRepository.insert(vital);
+
+    if (manualOverride) {
+      try {
+        await sensorLogsRepository.insert({ bed_id: bedIdNum, event: 'timeout', detail: 'vital ignored due to manual override' });
+      } catch (logErr) {
+        console.error('[VitalsController] sensor_log insert failed (override):', logErr.message);
+      }
+      // do not emit websocket events or create alerts while manual override is enabled
+      return res.status(201).json({ vital: inserted, ignored: true, reason: 'manual_override' });
+    }
     const anomalies = detectAnomalies(vital);
 
     io.emit('vital', {
