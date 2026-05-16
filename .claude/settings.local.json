@@ -10,7 +10,8 @@
       "Read(//mnt/c/Users/Carlos/Desktop/**)",
       "Bash(find /mnt/c/Users/Carlos/Desktop -maxdepth 3 -name \"*guideline*\" -o -name \"*plan*\" -o -name \"*fase*\" 2>/dev/null | head -20)",
       "Read(//mnt/c/Users/Carlos/**)",
-      "PowerShell([System.Environment]::GetFolderPath\\('Desktop'\\))"
+      "PowerShell([System.Environment]::GetFolderPath\\('Desktop'\\))",
+      "Bash(docker builder *)"
     ]
   }
 }

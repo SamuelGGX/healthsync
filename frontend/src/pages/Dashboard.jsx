@@ -68,13 +68,22 @@ function BedCard({ bed }) {
     <div
       className={[
         'rounded-2xl border-2 p-4 transition-all duration-500 flex flex-col gap-3',
-        isAlert  ? 'border-red-400 bg-red-50 alert-pulse'      : '',
+        isAlert  ? 'border-red-400 bg-red-50'                   : '',
         isNormal ? 'border-emerald-200 bg-white shadow-sm'     : '',
         !isAlert && !isNormal ? 'border-slate-200 bg-slate-50' : '',
       ].filter(Boolean).join(' ')}
     >
       <div className="flex items-start justify-between gap-2">
-        <span className="font-bold text-slate-700 text-sm">{bed.code}</span>
+        <div className="min-w-0">
+          <span className="font-bold text-slate-700 text-sm block">{bed.code}</span>
+          {bed.patientName ? (
+            <span className="text-[11px] text-slate-500 truncate block" title={bed.patientName}>
+              {bed.patientName}
+            </span>
+          ) : (
+            <span className="text-[11px] text-slate-400 italic">Sin paciente</span>
+          )}
+        </div>
         <StatusBadge status={bed.status} alertType={bed.alertType} />
       </div>
 
@@ -115,7 +124,7 @@ function StatusBadge({ status, alertType }) {
   if (status === 'alert') {
     const label = ALERT_LABELS[alertType] ?? 'Alerta'
     return (
-      <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-700 animate-pulse whitespace-nowrap">
+      <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-700 whitespace-nowrap">
         {label}
       </span>
     )
@@ -165,7 +174,13 @@ export default function Dashboard() {
       .then(data => {
         const initial = {}
         data.forEach(b => {
-          initial[b.id] = { id: b.id, code: b.code, status: 'disconnected' }
+          initial[b.id] = {
+            id:               b.id,
+            code:             b.code,
+            status:           'disconnected',
+            patientName:      b.patient_name      ?? null,
+            patientBloodType: b.patient_blood_type ?? null,
+          }
         })
         setBeds(initial)
       })
