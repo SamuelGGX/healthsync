@@ -1,57 +1,83 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 const API_URL = `http://${window.location.hostname}:3000`
 
-const PRESETS = {
-  normal:      { bpm: 80,  spo2: 97, temperature: 36.5 },
-  tachycardia: { bpm: 180, spo2: 97, temperature: 36.5 },
-  bradycardia: { bpm: 30,  spo2: 97, temperature: 36.5 },
-  lowOxygen:   { bpm: 80,  spo2: 85, temperature: 36.5 },
-  invalid:     { bpm: 80,  spo2: 97, temperature: 150  },
+const PRESETS = [
+  { key: 'normal',      label: 'Normal',      values: { bpm: 80,  spo2: 97, temperature: 36.5 }, style: 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100' },
+  { key: 'tachycardia', label: 'Taquicardia', values: { bpm: 180, spo2: 97, temperature: 36.5 }, style: 'bg-red-50 border-red-200 text-red-700 hover:bg-red-100' },
+  { key: 'bradycardia', label: 'Bradicardia', values: { bpm: 30,  spo2: 97, temperature: 36.5 }, style: 'bg-orange-50 border-orange-200 text-orange-700 hover:bg-orange-100' },
+  { key: 'lowOxygen',   label: 'Hipoxia',     values: { bpm: 80,  spo2: 85, temperature: 36.5 }, style: 'bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100' },
+  { key: 'invalid',     label: 'Imposible',   values: { bpm: 80,  spo2: 97, temperature: 150  }, style: 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100' },
+]
+
+const STREAM_DURATION = 30
+
+function Field({ label, children }) {
+  return (
+    <div className="space-y-1.5">
+      <label className="block text-sm font-medium text-slate-700">{label}</label>
+      {children}
+    </div>
+  )
+}
+
+const inputClass =
+  'w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition'
+
+async function postVitals(snapshot) {
+  const res = await fetch(`${API_URL}/vitals`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      bed_id:      Number(snapshot.bedId),
+      bpm:         Number(snapshot.bpm),
+      spo2:        Number(snapshot.spo2),
+      temperature: Number(snapshot.temperature),
+    }),
+  })
+  const data = await res.json()
+  return { status: res.status, data }
 }
 
 function Sender() {
-  const [beds, setBeds] = useState([])
-  const [bedId, setBedId] = useState('')
-  const [bpm, setBpm] = useState(80)
-  const [spo2, setSpo2] = useState(97)
-  const [temperature, setTemperature] = useState(36.5)
-  const [response, setResponse] = useState(null)
-  const [loading, setLoading] = useState(false)
+  const [beds, setBeds]           = useState([])
+  const [bedId, setBedId]         = useState('')
+  const [bpm, setBpm]             = useState(80)
+  const [spo2, setSpo2]           = useState(97)
+  const [temperature, setTemp]    = useState(36.5)
+  const [response, setResponse]   = useState(null)
+  const [loading, setLoading]     = useState(false)
   const [bedsError, setBedsError] = useState(null)
+
+  const [streaming, setStreaming] = useState(false)
+  const [countdown, setCountdown] = useState(0)
+  const streamRef                 = useRef(null)
 
   useEffect(() => {
     fetch(`${API_URL}/beds`)
-      .then((r) => r.json())
-      .then((data) => {
+      .then(r => r.json())
+      .then(data => {
         setBeds(data)
         if (data.length > 0) setBedId(String(data[0].id))
       })
-      .catch((err) => setBedsError(err.message))
+      .catch(err => setBedsError(err.message))
   }, [])
 
-  const applyPreset = (p) => {
-    setBpm(p.bpm)
-    setSpo2(p.spo2)
-    setTemperature(p.temperature)
+  useEffect(() => () => clearInterval(streamRef.current), [])
+
+  const applyPreset = ({ bpm, spo2, temperature }) => {
+    setBpm(bpm)
+    setSpo2(spo2)
+    setTemp(temperature)
   }
 
   const send = async () => {
+    if (loading || streaming || !bedId) return
     setLoading(true)
     setResponse(null)
     try {
-      const res = await fetch(`${API_URL}/vitals`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          bed_id:      Number(bedId),
-          bpm:         Number(bpm),
-          spo2:        Number(spo2),
-          temperature: Number(temperature),
-        }),
-      })
-      const data = await res.json()
-      setResponse({ status: res.status, data })
+      const result = await postVitals({ bedId, bpm, spo2, temperature })
+      setResponse(result)
     } catch (err) {
       setResponse({ error: err.message })
     } finally {
@@ -59,109 +85,197 @@ function Sender() {
     }
   }
 
+  const startStream = () => {
+    if (!bedId || streaming) return
+
+    const snapshot  = { bedId, bpm, spo2, temperature }
+    let   remaining = STREAM_DURATION
+
+    setStreaming(true)
+    setCountdown(remaining)
+    setResponse(null)
+
+    const doSend = async () => {
+      try {
+        const result = await postVitals(snapshot)
+        setResponse(result)
+      } catch (err) {
+        setResponse({ error: err.message })
+      }
+      remaining -= 1
+      setCountdown(remaining)
+      if (remaining <= 0) {
+        clearInterval(streamRef.current)
+        setStreaming(false)
+      }
+    }
+
+    doSend()
+    streamRef.current = setInterval(doSend, 1000)
+  }
+
+  const stopStream = () => {
+    clearInterval(streamRef.current)
+    setStreaming(false)
+    setCountdown(0)
+  }
+
+  const progress       = ((STREAM_DURATION - countdown) / STREAM_DURATION) * 100
+  const statusColor    = response
+    ? response.error || response.status >= 400
+      ? 'bg-red-100 text-red-800 border-red-200'
+      : 'bg-emerald-100 text-emerald-800 border-emerald-200'
+    : ''
+
   return (
-    <div className="space-y-4">
+    <div className="max-w-2xl space-y-5">
       <div>
-        <h1 className="text-xl font-semibold">Enviar vitals</h1>
-        <p className="text-sm text-gray-600">Manda lecturas manuales a cualquier cama.</p>
+        <h1 className="text-xl font-bold text-slate-800">Enviar vitals</h1>
+        <p className="text-sm text-slate-500 mt-0.5">Manda lecturas manuales a cualquier cama para probar el sistema.</p>
       </div>
 
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 space-y-4">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-5">
         {bedsError && (
-          <div className="bg-red-50 border border-red-200 text-red-700 text-sm p-3 rounded">
+          <div className="bg-red-50 border border-red-200 text-red-700 text-sm p-3 rounded-lg">
             No se pudieron cargar las camas: {bedsError}
           </div>
         )}
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Cama</label>
+        <Field label="Cama">
           <select
-            className="w-full border border-gray-300 rounded px-3 py-2 bg-white"
+            className={inputClass}
             value={bedId}
-            onChange={(e) => setBedId(e.target.value)}
+            onChange={e => setBedId(e.target.value)}
+            disabled={streaming}
           >
-            {beds.map((b) => (
+            {beds.map(b => (
               <option key={b.id} value={b.id}>{b.code}</option>
             ))}
           </select>
-        </div>
+        </Field>
 
         <div className="grid grid-cols-3 gap-3">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">BPM</label>
+          <Field label="BPM">
             <input
               type="number"
-              className="w-full border border-gray-300 rounded px-3 py-2"
+              className={inputClass}
               value={bpm}
-              onChange={(e) => setBpm(e.target.value)}
+              onChange={e => setBpm(e.target.value)}
+              disabled={streaming}
             />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">SpO2 (%)</label>
+          </Field>
+          <Field label="SpO2 (%)">
             <input
               type="number"
-              className="w-full border border-gray-300 rounded px-3 py-2"
+              className={inputClass}
               value={spo2}
-              onChange={(e) => setSpo2(e.target.value)}
+              onChange={e => setSpo2(e.target.value)}
+              disabled={streaming}
             />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Temp (°C)</label>
+          </Field>
+          <Field label="Temp (°C)">
             <input
               type="number"
               step="0.1"
-              className="w-full border border-gray-300 rounded px-3 py-2"
+              className={inputClass}
               value={temperature}
-              onChange={(e) => setTemperature(e.target.value)}
+              onChange={e => setTemp(e.target.value)}
+              disabled={streaming}
             />
+          </Field>
+        </div>
+
+        <div>
+          <p className="text-xs font-medium text-slate-500 mb-2">Escenarios de prueba</p>
+          <div className="flex flex-wrap gap-2">
+            {PRESETS.map(p => (
+              <button
+                key={p.key}
+                onClick={() => applyPreset(p.values)}
+                disabled={streaming}
+                className={`text-xs font-medium px-3 py-1.5 border rounded-lg transition disabled:opacity-40 disabled:cursor-not-allowed ${p.style}`}
+              >
+                {p.label}
+              </button>
+            ))}
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-2 items-center pt-1">
-          <span className="text-xs text-gray-500">Presets:</span>
-          <button onClick={() => applyPreset(PRESETS.normal)}      className="text-xs px-3 py-1 border border-gray-300 rounded hover:bg-gray-100">Normal</button>
-          <button onClick={() => applyPreset(PRESETS.tachycardia)} className="text-xs px-3 py-1 border border-gray-300 rounded hover:bg-gray-100">Taquicardia</button>
-          <button onClick={() => applyPreset(PRESETS.bradycardia)} className="text-xs px-3 py-1 border border-gray-300 rounded hover:bg-gray-100">Bradicardia</button>
-          <button onClick={() => applyPreset(PRESETS.lowOxygen)}   className="text-xs px-3 py-1 border border-gray-300 rounded hover:bg-gray-100">Hipoxia</button>
-          <button onClick={() => applyPreset(PRESETS.invalid)}     className="text-xs px-3 py-1 border border-gray-300 rounded hover:bg-gray-100">Imposible</button>
-        </div>
-
-        <button
-          onClick={send}
-          disabled={loading || !bedId}
-          className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {loading ? 'Enviando…' : 'Enviar'}
-        </button>
+        {/* Action buttons */}
+        {!streaming ? (
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              onClick={send}
+              disabled={loading || !bedId}
+              className="bg-blue-600 text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-blue-700 active:bg-blue-800 disabled:opacity-50 disabled:cursor-not-allowed transition"
+            >
+              {loading ? 'Enviando…' : 'Enviar'}
+            </button>
+            <button
+              onClick={startStream}
+              disabled={!bedId}
+              className="bg-slate-800 text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-slate-700 active:bg-slate-900 disabled:opacity-50 disabled:cursor-not-allowed transition"
+            >
+              Transmitir 30s
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-2.5">
+            <div className="flex items-center justify-between text-sm">
+              <span className="font-semibold text-slate-700">Transmitiendo…</span>
+              <span className="tabular-nums text-slate-500">{countdown}s restantes</span>
+            </div>
+            <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+              <div
+                className="bg-blue-600 h-2 rounded-full transition-all duration-1000 ease-linear"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+            <button
+              onClick={stopStream}
+              className="w-full bg-red-50 border border-red-200 text-red-700 py-2.5 rounded-lg text-sm font-semibold hover:bg-red-100 active:bg-red-200 transition"
+            >
+              Detener
+            </button>
+          </div>
+        )}
       </div>
 
       {response && (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 space-y-3">
-          <h2 className="text-base font-semibold">Respuesta del backend</h2>
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-slate-700">
+              Respuesta del backend
+              {streaming && (
+                <span className="ml-2 text-xs font-normal text-blue-600">· actualizando en vivo</span>
+              )}
+            </h2>
+            {!response.error && (
+              <span className={`text-xs font-bold px-2.5 py-1 rounded-full border ${statusColor}`}>
+                HTTP {response.status}
+              </span>
+            )}
+          </div>
+
           {response.error ? (
-            <div className="bg-red-50 border border-red-200 text-red-700 text-sm p-3 rounded">
-              Error: {response.error}
+            <div className="bg-red-50 border border-red-200 text-red-700 text-sm p-3 rounded-lg">
+              {response.error}
             </div>
           ) : (
             <>
-              <div className={`inline-block text-xs font-semibold px-2 py-1 rounded ${
-                response.status >= 400
-                  ? 'bg-red-100 text-red-800'
-                  : 'bg-green-100 text-green-800'
-              }`}>
-                HTTP {response.status}
-              </div>
               {response.data?.alerts?.length > 0 && (
-                <div className="bg-yellow-50 border border-yellow-300 p-3 rounded text-sm">
-                  <div className="font-semibold mb-1">
-                    ⚠ {response.data.alerts.length} alerta(s) disparada(s):
-                  </div>
-                  {response.data.alerts.map((a) => (
-                    <div key={a.id}>· {a.type} — {a.message} (value={a.value})</div>
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 space-y-1">
+                  <p className="text-xs font-semibold text-amber-800">
+                    {response.data.alerts.length} alerta(s) disparada(s)
+                  </p>
+                  {response.data.alerts.map(a => (
+                    <p key={a.id} className="text-xs text-amber-700">
+                      · {a.type} — {a.message} (valor: {a.value})
+                    </p>
                   ))}
                 </div>
               )}
-              <pre className="bg-gray-50 border border-gray-200 rounded p-3 text-xs overflow-x-auto">
+              <pre className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-xs overflow-x-auto text-slate-700 leading-relaxed">
                 {JSON.stringify(response.data, null, 2)}
               </pre>
             </>
