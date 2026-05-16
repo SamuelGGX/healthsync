@@ -10,10 +10,10 @@ function startStaleMonitor(io) {
   async function checkStaleBeds() {
     try {
       const { rows } = await pool.query(`
-        SELECT b.id, b.status, b.manual_override, MAX(v.recorded_at) AS last_reading
+        SELECT b.id, b.status, MAX(v.recorded_at) AS last_reading
         FROM beds b
         LEFT JOIN vitals v ON v.bed_id = b.id
-        GROUP BY b.id, b.status, b.manual_override
+        GROUP BY b.id, b.status
       `);
 
       const now = Date.now();
@@ -21,9 +21,6 @@ function startStaleMonitor(io) {
         const bedId = r.id;
         const dbStatus = r.status;
         const last = r.last_reading ? new Date(r.last_reading).getTime() : null;
-
-        // respetar override manual: si hay manual_override no tocar status
-        if (r.manual_override) continue;
 
         // marcar desconectado solo si hubo al menos una lectura antes
         if (last && now - last > STALE_THRESHOLD_MS) {

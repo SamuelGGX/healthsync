@@ -6,6 +6,7 @@ async function findAllWithLastVital() {
       b.id,
       b.code,
       b.status,
+      b.manual_override,
       p.full_name   AS patient_name,
       p.blood_type  AS patient_blood_type,
       v.bpm,

@@ -10,6 +10,7 @@ const server = http.createServer(app);
 const io     = new Server(server, {
   cors: { origin: process.env.CORS_ORIGIN || '*' },
 });
+let staleMonitor = null;
 
 const PORT = process.env.BACKEND_PORT || 3000;
 
@@ -48,41 +49,25 @@ async function startServer() {
     // continuar arrancando, las rutas ya manejan errores de BD
   }
 
-  // asegurar columna manual_override en la tabla beds
-  try {
-    await db.query("ALTER TABLE beds ADD COLUMN IF NOT EXISTS manual_override BOOLEAN NOT NULL DEFAULT FALSE;");
-  } catch (err) {
-    console.error('[startup] could not ensure manual_override column:', err.message);
-  }
-
   // arrancar el monitor de camas desconectadas
-  const staleMonitor = startStaleMonitor(io);
+  staleMonitor = startStaleMonitor(io);
 
   server.listen(PORT, () => {
     console.log(`Backend running on port ${PORT}`);
   });
 
-  process.on('SIGTERM', () => {
-    console.log('SIGTERM received, stopping stale monitor...');
-    try { staleMonitor.stop(); } catch (e) { /* ignore */ }
-    process.exit(0);
-  });
-  process.on('SIGINT', () => {
-    console.log('SIGINT received, stopping stale monitor...');
-    try { staleMonitor.stop(); } catch (e) { /* ignore */ }
-    process.exit(0);
-  });
+  process.on('SIGTERM', shutdown);
+  process.on('SIGINT', shutdown);
 }
 
 startServer();
 
-process.on('SIGTERM', () => {
-  console.log('SIGTERM received, stopping stale monitor...');
-  try { staleMonitor.stop(); } catch (e) { /* ignore */ }
+function shutdown() {
+  console.log('Shutdown received, stopping stale monitor...');
+  try {
+    staleMonitor?.stop();
+  } catch (e) {
+    // ignore
+  }
   process.exit(0);
-});
-process.on('SIGINT', () => {
-  console.log('SIGINT received, stopping stale monitor...');
-  try { staleMonitor.stop(); } catch (e) { /* ignore */ }
-  process.exit(0);
-});
+}
