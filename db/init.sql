@@ -134,3 +134,29 @@ INSERT INTO beds (code, status) VALUES
     ('CAMA-08', 'active'),
     ('CAMA-09', 'active'),
     ('CAMA-10', 'active');
+
+-- 10 pacientes de ejemplo
+INSERT INTO patients (full_name, document_id, birth_date, blood_type) VALUES
+    ('Carlos Mendoza López',     '001-880512-0001A', '1988-05-12', 'O+'),
+    ('Ana Sofía Reyes Torres',   '002-920318-0002B', '1992-03-18', 'A+'),
+    ('Roberto Jiménez Vega',     '003-750824-0003C', '1975-08-24', 'B+'),
+    ('María Elena Castillo',     '004-860930-0004D', '1986-09-30', 'AB+'),
+    ('José Antonio Flores',      '005-910201-0005E', '1991-02-01', 'O-'),
+    ('Lucía Morales Gutiérrez',  '006-830715-0006F', '1983-07-15', 'A-'),
+    ('Fernando López Cruz',      '007-970425-0007G', '1997-04-25', 'B-'),
+    ('Patricia Herrera Núñez',   '008-890610-0008H', '1989-06-10', 'AB-'),
+    ('Miguel Ángel Soto',        '009-800303-0009I', '1980-03-03', 'O+'),
+    ('Carmen Lucía Alvarado',    '010-950820-0010J', '1995-08-20', 'A+');
+
+-- Asignaciones activas: un paciente por cama
+INSERT INTO bed_assignments (bed_id, patient_id, assigned_user_id, assigned_at) VALUES
+    (1,  1,  1, NOW() - INTERVAL '5 days'),
+    (2,  2,  1, NOW() - INTERVAL '3 days'),
+    (3,  3,  1, NOW() - INTERVAL '7 days'),
+    (4,  4,  1, NOW() - INTERVAL '2 days'),
+    (5,  5,  1, NOW() - INTERVAL '1 day'),
+    (6,  6,  1, NOW() - INTERVAL '4 days'),
+    (7,  7,  1, NOW() - INTERVAL '6 days'),
+    (8,  8,  1, NOW() - INTERVAL '8 days'),
+    (9,  9,  1, NOW() - INTERVAL '2 days'),
+    (10, 10, 1, NOW() - INTERVAL '3 days');
