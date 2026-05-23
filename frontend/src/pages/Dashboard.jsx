@@ -9,6 +9,12 @@ const ALERT_LABELS = {
   low_oxygen:   'Hipoxia',
 }
 
+const METRIC_LABELS = {
+  bpm:         'BPM',
+  spo2:        'SpO2',
+  temperature: 'Temperatura',
+}
+
 function formatElapsed(isoString) {
   if (!isoString) return '—'
   const secs = Math.floor((Date.now() - new Date(isoString)) / 1000)
@@ -42,6 +48,14 @@ function TempIcon() {
   )
 }
 
+function WarningIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/>
+    </svg>
+  )
+}
+
 function MetricBox({ icon, label, value, isAbnormal }) {
   return (
     <div className={`rounded-lg p-2 text-center ${isAbnormal ? 'bg-red-100' : 'bg-slate-100'}`}>
@@ -56,21 +70,60 @@ function MetricBox({ icon, label, value, isAbnormal }) {
   )
 }
 
+function StatusBadge({ status, alertType }) {
+  if (status === 'alert') {
+    const label = ALERT_LABELS[alertType] ?? 'Alerta'
+    return (
+      <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-700 whitespace-nowrap">
+        {label}
+      </span>
+    )
+  }
+  if (status === 'normal') {
+    return (
+      <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 whitespace-nowrap">
+        Normal
+      </span>
+    )
+  }
+  if (status === 'inactive') {
+    return (
+      <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-200 text-slate-500 whitespace-nowrap">
+        Apagado
+      </span>
+    )
+  }
+  // disconnected (inesperado)
+  return (
+    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-200 text-amber-900 whitespace-nowrap flex items-center gap-1">
+      <WarningIcon /> Desconectado
+    </span>
+  )
+}
+
 function BedCard({ bed }) {
-  const isAlert  = bed.status === 'alert'
-  const isNormal = bed.status === 'normal'
-  const hasData  = bed.bpm !== undefined
+  const isAlert        = bed.status === 'alert'
+  const isNormal       = bed.status === 'normal'
+  const isInactive     = bed.status === 'inactive'
+  const isDisconnected = bed.status === 'disconnected'
+  const hasData        = bed.bpm !== undefined
 
   const bpmAbnormal  = isAlert && hasData && (bed.bpm > 150 || bed.bpm < 40)
   const spo2Abnormal = isAlert && hasData && bed.spo2 < 90
+
+  const sensorErr      = bed.sensorError
+  const sensorErrLabel = sensorErr
+    ? `Error sensor (${METRIC_LABELS[sensorErr.metric] ?? sensorErr.metric}: ${sensorErr.value})`
+    : null
 
   return (
     <div
       className={[
         'rounded-2xl border-2 p-4 transition-all duration-500 flex flex-col gap-3',
-        isAlert  ? 'border-red-400 bg-red-50'                   : '',
-        isNormal ? 'border-emerald-200 bg-white shadow-sm'     : '',
-        !isAlert && !isNormal ? 'border-slate-200 bg-slate-50' : '',
+        isAlert        ? 'border-red-400 bg-red-50'                         : '',
+        isNormal       ? 'border-emerald-200 bg-white shadow-sm'           : '',
+        isDisconnected ? 'border-amber-400 bg-amber-50 alert-pulse'        : '',
+        isInactive     ? 'border-slate-200 bg-slate-50 opacity-70'         : '',
       ].filter(Boolean).join(' ')}
     >
       <div className="flex items-start justify-between gap-2">
@@ -87,7 +140,16 @@ function BedCard({ bed }) {
         <StatusBadge status={bed.status} alertType={bed.alertType} />
       </div>
 
-      {hasData ? (
+      {sensorErr && (
+        <div
+          className="text-[11px] font-semibold px-2 py-1 rounded bg-amber-100 text-amber-800 border border-amber-300 flex items-center gap-1.5"
+          title={sensorErr.reason}
+        >
+          <WarningIcon /> <span className="truncate">{sensorErrLabel}</span>
+        </div>
+      )}
+
+      {hasData && !isInactive ? (
         <>
           <div className="grid grid-cols-3 gap-1.5">
             <MetricBox
@@ -113,33 +175,12 @@ function BedCard({ bed }) {
             {formatElapsed(bed.lastReading)}
           </p>
         </>
+      ) : isInactive ? (
+        <p className="text-xs text-slate-400 text-center py-3 italic">Monitoreo apagado</p>
       ) : (
         <p className="text-xs text-slate-400 text-center py-3">Sin lecturas</p>
       )}
     </div>
-  )
-}
-
-function StatusBadge({ status, alertType }) {
-  if (status === 'alert') {
-    const label = ALERT_LABELS[alertType] ?? 'Alerta'
-    return (
-      <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-700 whitespace-nowrap">
-        {label}
-      </span>
-    )
-  }
-  if (status === 'normal') {
-    return (
-      <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 whitespace-nowrap">
-        Normal
-      </span>
-    )
-  }
-  return (
-    <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-200 text-slate-500 whitespace-nowrap">
-      Sin señal
-    </span>
   )
 }
 
@@ -149,6 +190,7 @@ function StatCard({ label, value, accent }) {
     emerald: 'text-emerald-700 bg-emerald-50 border-emerald-200',
     red:     'text-red-700    bg-red-50     border-red-200',
     amber:   'text-amber-700  bg-amber-50   border-amber-200',
+    gray:    'text-slate-600  bg-slate-100  border-slate-200',
   }
   return (
     <div className={`rounded-xl border p-4 shadow-sm ${accents[accent]}`}>
@@ -156,6 +198,16 @@ function StatCard({ label, value, accent }) {
       <div className="text-xs font-medium mt-0.5 opacity-75">{label}</div>
     </div>
   )
+}
+
+// Mapea el status del backend al status que la UI muestra inicialmente.
+// 'active' -> 'normal' (optimista; los eventos 'vital' lo refinan)
+// 'inactive' / 'disconnected' -> tal cual
+function uiStatusFromDb(dbStatus) {
+  if (dbStatus === 'active')       return 'normal'
+  if (dbStatus === 'inactive')     return 'inactive'
+  if (dbStatus === 'disconnected') return 'disconnected'
+  return 'inactive'
 }
 
 export default function Dashboard() {
@@ -177,9 +229,14 @@ export default function Dashboard() {
           initial[b.id] = {
             id:               b.id,
             code:             b.code,
-            status:           'disconnected',
+            status:           uiStatusFromDb(b.status),
+            autoSimulate:     b.auto_simulate,
             patientName:      b.patient_name      ?? null,
             patientBloodType: b.patient_blood_type ?? null,
+            bpm:              b.bpm,
+            spo2:             b.spo2,
+            temperature:      b.temperature,
+            lastReading:      b.last_reading,
           }
         })
         setBeds(initial)
@@ -194,19 +251,28 @@ export default function Dashboard() {
     socket.on('disconnect', () => setConnected(false))
 
     socket.on('vital', ({ bed_id, bpm, spo2, temperature, recorded_at, is_anomaly }) => {
-      setBeds(prev => ({
-        ...prev,
-        [bed_id]: {
-          ...prev[bed_id],
-          id:          bed_id,
-          bpm,
-          spo2,
-          temperature,
-          lastReading: recorded_at ?? new Date().toISOString(),
-          status:      is_anomaly ? 'alert' : 'normal',
-          alertType:   is_anomaly ? prev[bed_id]?.alertType : undefined,
-        },
-      }))
+      setBeds(prev => {
+        const current = prev[bed_id]
+        // Si la cama está manualmente desconectada o apagada, ignoramos vitals
+        // tardíos para que no la "revivan" antes de que el simulator se entere.
+        if (current?.status === 'disconnected' || current?.status === 'inactive') {
+          return prev
+        }
+        return {
+          ...prev,
+          [bed_id]: {
+            ...current,
+            id:          bed_id,
+            bpm,
+            spo2,
+            temperature,
+            lastReading: recorded_at ?? new Date().toISOString(),
+            status:      is_anomaly ? 'alert' : 'normal',
+            alertType:   is_anomaly ? current?.alertType : undefined,
+            sensorError: null,
+          },
+        }
+      })
     })
 
     socket.on('alert', ({ bed_id, type }) => {
@@ -224,8 +290,35 @@ export default function Dashboard() {
         ...prev,
         [bed_id]: {
           ...prev[bed_id],
-          // mapear el status 'active' de la BD a 'normal' para la UI
-          status: status === 'active' ? 'normal' : status,
+          status: uiStatusFromDb(status),
+          // si se apaga, limpia datos viejos para que no se vean residuales
+          ...(status === 'inactive' ? { alertType: undefined, sensorError: null } : {}),
+        },
+      }))
+    })
+
+    socket.on('bed_status_bulk', ({ status }) => {
+      if (status !== 'inactive') return // solo manejamos apagado masivo aquí
+      setBeds(prev => {
+        const next = {}
+        for (const id in prev) {
+          next[id] = {
+            ...prev[id],
+            status:     'inactive',
+            alertType:  undefined,
+            sensorError: null,
+          }
+        }
+        return next
+      })
+    })
+
+    socket.on('sensor_error', ({ bed_id, metric, value, reason, occurred_at }) => {
+      setBeds(prev => ({
+        ...prev,
+        [bed_id]: {
+          ...prev[bed_id],
+          sensorError: { metric, value, reason, time: occurred_at ?? new Date().toISOString() },
         },
       }))
     })
@@ -238,10 +331,12 @@ export default function Dashboard() {
   )
 
   const stats = {
-    total:    bedList.length,
-    normal:   bedList.filter(b => b.status === 'normal').length,
-    alert:    bedList.filter(b => b.status === 'alert').length,
-    noSignal: bedList.filter(b => b.status === 'disconnected').length,
+    total:        bedList.length,
+    normal:       bedList.filter(b => b.status === 'normal').length,
+    alert:        bedList.filter(b => b.status === 'alert').length,
+    disconnected: bedList.filter(b => b.status === 'disconnected').length,
+    inactive:     bedList.filter(b => b.status === 'inactive').length,
+    sensorError:  bedList.filter(b => b.sensorError).length,
   }
 
   void tick
@@ -253,11 +348,13 @@ export default function Dashboard() {
         <p className="text-sm text-slate-500 mt-0.5">Estado de todas las camas via WebSocket</p>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <StatCard label="Total camas"  value={stats.total}    accent="slate"   />
-        <StatCard label="Normal"       value={stats.normal}   accent="emerald" />
-        <StatCard label="En alerta"    value={stats.alert}    accent="red"     />
-        <StatCard label="Sin señal"    value={stats.noSignal} accent="amber"   />
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        <StatCard label="Total camas"   value={stats.total}        accent="slate"   />
+        <StatCard label="Normal"        value={stats.normal}       accent="emerald" />
+        <StatCard label="En alerta"     value={stats.alert}        accent="red"     />
+        <StatCard label="Desconectadas" value={stats.disconnected} accent="amber"   />
+        <StatCard label="Apagadas"      value={stats.inactive}     accent="gray"    />
+        <StatCard label="Error sensor"  value={stats.sensorError}  accent="amber"   />
       </div>
 
       <div className="flex items-center gap-2">
