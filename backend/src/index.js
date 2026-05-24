@@ -2,6 +2,7 @@ require('dotenv').config();
 const express      = require('express');
 const cors         = require('cors');
 const http         = require('http');
+const jwt          = require('jsonwebtoken');
 const { Server }   = require('socket.io');
 const pool         = require('./db');
 
@@ -18,6 +19,24 @@ app.use(cors());
 app.use(express.json());
 
 app.set('io', io);
+
+
+io.use((socket, next) => {
+  const apiKey = socket.handshake.auth?.apiKey || socket.handshake.headers['x-api-key'];
+  if (apiKey && apiKey === process.env.SIMULATOR_API_KEY) {
+    socket.data.user = { role: 'simulator' };
+    return next();
+  }
+
+  const token = socket.handshake.auth?.token;
+  if (!token) return next(new Error('No autorizado'));
+  try {
+    socket.data.user = jwt.verify(token, process.env.JWT_SECRET);
+    next();
+  } catch {
+    next(new Error('Token inválido o expirado'));
+  }
+});
 
 const auth = require('./middleware/auth');
 

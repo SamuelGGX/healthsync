@@ -298,6 +298,7 @@ export default function Dashboard() {
 
     const socket = io(`http://${window.location.hostname}:3000`, {
       transports: ['websocket'],
+      auth: { token },
     })
 
     socket.on('connect',    () => setConnected(true))
