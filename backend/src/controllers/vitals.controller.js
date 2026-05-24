@@ -44,6 +44,18 @@ async function create(req, res) {
     } catch (logErr) {
       console.error('[VitalsController] sensor_log insert failed:', logErr.message);
     }
+
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('sensor_error', {
+        bed_id:      bedIdNum,
+        metric:      rangeCheck.metric,
+        value:       rangeCheck.value,
+        reason:      rangeCheck.reason,
+        occurred_at: new Date().toISOString(),
+      });
+    }
+
     return res.status(422).json({
       error:  'Vital out of physical range',
       detail: rangeCheck.reason,
