@@ -36,7 +36,7 @@ export default function Login() {
         setError(data.error || 'Error al iniciar sesión')
         return
       }
-      login(data.token, data.user)
+      login(data.accessToken, data.refreshToken, data.user)
       navigate('/dashboard', { replace: true })
     } catch {
       setError('No se pudo conectar al servidor')
