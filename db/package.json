@@ -1,0 +1,12 @@
+{
+  "name": "healthsync-db-tools",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Scripts auxiliares para la base de datos (generación de hashes, etc.)",
+  "scripts": {
+    "hashes": "node generate-hashes.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3"
+  }
+}
