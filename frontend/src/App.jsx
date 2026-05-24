@@ -5,6 +5,7 @@ import Dashboard from './pages/Dashboard'
 import Sender from './pages/Sender'
 import Login from './pages/Login'
 import CreateUser from './pages/CreateUser'
+import SlowQueries from './pages/SlowQueries'
 
 function PulseIcon() {
   return (
@@ -44,6 +45,7 @@ function AppLayout() {
             <NavLink to="/dashboard" className={navLink}>Dashboard</NavLink>
             {isAdmin && <NavLink to="/sender" className={navLink}>Enviar vitals</NavLink>}
             {isAdmin && <NavLink to="/create-user" className={navLink}>Crear usuario</NavLink>}
+            {isAdmin && <NavLink to="/slow-queries" className={navLink}>Slow Queries</NavLink>}
           </div>
 
           {user && (
@@ -79,6 +81,11 @@ function AppLayout() {
           <Route path="/create-user" element={
             <ProtectedRoute roles={['admin']}>
               <CreateUser />
+            </ProtectedRoute>
+          } />
+          <Route path="/slow-queries" element={
+            <ProtectedRoute roles={['admin']}>
+              <SlowQueries />
             </ProtectedRoute>
           } />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />

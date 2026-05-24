@@ -1,6 +1,9 @@
 -- Habilitar extensión TimescaleDB
 CREATE EXTENSION IF NOT EXISTS timescaledb;
 
+-- Slow query tracking
+CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
+
 -- ============================================================
 -- TABLA: users
 -- ============================================================
