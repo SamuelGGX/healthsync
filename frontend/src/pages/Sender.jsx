@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useAuth } from '../context/AuthContext'
 
 const API_URL = `http://${window.location.hostname}:3000`
 
@@ -24,10 +25,13 @@ function Field({ label, children }) {
 const inputClass =
   'w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition'
 
-async function postVitals(snapshot) {
+async function postVitals(snapshot, token) {
   const res = await fetch(`${API_URL}/vitals`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type':  'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
     body: JSON.stringify({
       bed_id:      Number(snapshot.bedId),
       bpm:         Number(snapshot.bpm),
@@ -39,10 +43,13 @@ async function postVitals(snapshot) {
   return { status: res.status, data }
 }
 
-async function putSimulate(bedId, enabled) {
+async function putSimulate(bedId, enabled, token) {
   const res = await fetch(`${API_URL}/beds/${bedId}/simulate`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type':  'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
     body: JSON.stringify({ enabled }),
   })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
@@ -51,10 +58,13 @@ async function putSimulate(bedId, enabled) {
 
 // Pausa o reactiva el simulator SIN cambiar el status de la cama
 // (para no romper la vista en el dashboard durante un stream manual).
-async function pauseSimulator(bedId, paused) {
+async function pauseSimulator(bedId, paused, token) {
   const res = await fetch(`${API_URL}/beds/${bedId}/simulator-pause`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type':  'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
     body: JSON.stringify({ paused }),
   })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
@@ -80,6 +90,8 @@ function SimulatorToggle({ enabled, onClick }) {
 }
 
 function Sender() {
+  const { token } = useAuth()
+
   const [beds, setBeds]           = useState([])
   const [bedId, setBedId]         = useState('')
   const [bpm, setBpm]             = useState(80)
@@ -97,9 +109,11 @@ function Sender() {
   const [searchTerm, setSearchTerm]   = useState('')
   const [togglingAll, setTogglingAll] = useState(false)
 
+  const authHeaders = token ? { Authorization: `Bearer ${token}` } : {}
+
   const refreshBeds = async () => {
     try {
-      const res = await fetch(`${API_URL}/beds`)
+      const res = await fetch(`${API_URL}/beds`, { headers: authHeaders })
       const data = await res.json()
       setBeds(data)
       if (!bedId && data.length > 0) setBedId(String(data[0].id))
@@ -126,7 +140,7 @@ function Sender() {
     setLoading(true)
     setResponse(null)
     try {
-      const result = await postVitals({ bedId, bpm, spo2, temperature })
+      const result = await postVitals({ bedId, bpm, spo2, temperature }, token)
       setResponse(result)
     } catch (err) {
       setResponse({ error: err.message })
@@ -147,7 +161,7 @@ function Sender() {
     // los valores que estamos transmitiendo).
     if (wasSimulating) {
       try {
-        await pauseSimulator(streamBedId, true)
+        await pauseSimulator(streamBedId, true, token)
         setBeds(prev => prev.map(b => b.id === streamBedId ? { ...b, auto_simulate: false } : b))
       } catch (err) {
         console.error('No se pudo pausar el simulator:', err)
@@ -173,7 +187,7 @@ function Sender() {
       // Restaurar auto_simulate solo si estaba prendido antes
       if (wasSimulating) {
         try {
-          await pauseSimulator(streamBedId, false)
+          await pauseSimulator(streamBedId, false, token)
           setBeds(prev => prev.map(b => b.id === streamBedId ? { ...b, auto_simulate: true } : b))
         } catch (err) {
           console.error('No se pudo restaurar el simulator:', err)
@@ -185,7 +199,7 @@ function Sender() {
 
     const doSend = async () => {
       try {
-        const result = await postVitals(snapshot)
+        const result = await postVitals(snapshot, token)
         setResponse(result)
       } catch (err) {
         setResponse({ error: err.message })
@@ -216,7 +230,7 @@ function Sender() {
         : b
     ))
     try {
-      await putSimulate(id, enabled)
+      await putSimulate(id, enabled, token)
     } catch (err) {
       console.error('toggleSimulate failed', err)
       setBeds(prev => prev.map(b =>
@@ -231,7 +245,7 @@ function Sender() {
     try {
       const res = await fetch(`${API_URL}/beds/simulate-all`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
         body: JSON.stringify({ enabled }),
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
@@ -251,7 +265,10 @@ function Sender() {
     setLoading(true)
     setResponse(null)
     try {
-      const r = await fetch(`${API_URL}/beds/${bedId}/disconnect`, { method: 'POST' })
+      const r = await fetch(`${API_URL}/beds/${bedId}/disconnect`, {
+        method:  'POST',
+        headers: authHeaders,
+      })
       const data = await r.json()
       setResponse({ status: r.status, data })
       setBeds(prev => prev.map(b =>
@@ -270,7 +287,10 @@ function Sender() {
     setLoading(true)
     setResponse(null)
     try {
-      const r = await fetch(`${API_URL}/beds/${bedId}/reconnect`, { method: 'POST' })
+      const r = await fetch(`${API_URL}/beds/${bedId}/reconnect`, {
+        method:  'POST',
+        headers: authHeaders,
+      })
       const data = await r.json()
       setResponse({ status: r.status, data })
       setBeds(prev => prev.map(b =>

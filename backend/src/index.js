@@ -19,8 +19,12 @@ app.use(express.json());
 
 app.set('io', io);
 
-app.use('/beds',   require('./routes/beds'));
-app.use('/vitals', require('./routes/vitals'));
+const auth = require('./middleware/auth');
+
+app.use('/auth',   require('./routes/auth'));
+app.use('/users',  require('./routes/users'));
+app.use('/beds',   auth, require('./routes/beds'));
+app.use('/vitals', auth, require('./routes/vitals'));
 
 app.get('/health', async (req, res) => {
   try {
