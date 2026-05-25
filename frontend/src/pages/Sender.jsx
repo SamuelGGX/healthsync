@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useAuth } from '../context/AuthContext'
 
 const API_URL = `http://${window.location.hostname}:3000`
 
@@ -24,10 +25,13 @@ function Field({ label, children }) {
 const inputClass =
   'w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition'
 
-async function postVitals(snapshot) {
+async function postVitals(snapshot, token) {
   const res = await fetch(`${API_URL}/vitals`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type':  'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
     body: JSON.stringify({
       bed_id:      Number(snapshot.bedId),
       bpm:         Number(snapshot.bpm),
@@ -39,7 +43,55 @@ async function postVitals(snapshot) {
   return { status: res.status, data }
 }
 
+async function putSimulate(bedId, enabled, token) {
+  const res = await fetch(`${API_URL}/beds/${bedId}/simulate`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type':  'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ enabled }),
+  })
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  return res.json()
+}
+
+// Pausa o reactiva el simulator SIN cambiar el status de la cama
+// (para no romper la vista en el dashboard durante un stream manual).
+async function pauseSimulator(bedId, paused, token) {
+  const res = await fetch(`${API_URL}/beds/${bedId}/simulator-pause`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type':  'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ paused }),
+  })
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  return res.json()
+}
+
+function SimulatorToggle({ enabled, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${
+        enabled ? 'bg-emerald-500' : 'bg-slate-300'
+      }`}
+      aria-label={enabled ? 'Desactivar simulator' : 'Activar simulator'}
+    >
+      <span
+        className={`absolute top-0.5 left-0.5 block w-5 h-5 bg-white rounded-full shadow transition-transform ${
+          enabled ? 'translate-x-5' : ''
+        }`}
+      />
+    </button>
+  )
+}
+
 function Sender() {
+  const { token } = useAuth()
+
   const [beds, setBeds]           = useState([])
   const [bedId, setBedId]         = useState('')
   const [bpm, setBpm]             = useState(80)
@@ -52,15 +104,27 @@ function Sender() {
   const [streaming, setStreaming] = useState(false)
   const [countdown, setCountdown] = useState(0)
   const streamRef                 = useRef(null)
+  const finishStreamRef           = useRef(null)
+
+  const [searchTerm, setSearchTerm]   = useState('')
+  const [togglingAll, setTogglingAll] = useState(false)
+
+  const authHeaders = token ? { Authorization: `Bearer ${token}` } : {}
+
+  const refreshBeds = async () => {
+    try {
+      const res = await fetch(`${API_URL}/beds`, { headers: authHeaders })
+      const data = await res.json()
+      setBeds(data)
+      if (!bedId && data.length > 0) setBedId(String(data[0].id))
+    } catch (err) {
+      setBedsError(err.message)
+    }
+  }
 
   useEffect(() => {
-    fetch(`${API_URL}/beds`)
-      .then(r => r.json())
-      .then(data => {
-        setBeds(data)
-        if (data.length > 0) setBedId(String(data[0].id))
-      })
-      .catch(err => setBedsError(err.message))
+    refreshBeds()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => () => clearInterval(streamRef.current), [])
@@ -76,7 +140,7 @@ function Sender() {
     setLoading(true)
     setResponse(null)
     try {
-      const result = await postVitals({ bedId, bpm, spo2, temperature })
+      const result = await postVitals({ bedId, bpm, spo2, temperature }, token)
       setResponse(result)
     } catch (err) {
       setResponse({ error: err.message })
@@ -85,19 +149,57 @@ function Sender() {
     }
   }
 
-  const startStream = () => {
+  const startStream = async () => {
     if (!bedId || streaming) return
 
-    const snapshot  = { bedId, bpm, spo2, temperature }
+    const streamBedId   = Number(bedId)
+    const currentBed    = beds.find(b => b.id === streamBedId)
+    const wasSimulating = !!currentBed?.auto_simulate
+
+    // Pausar el simulator para esta cama mientras dura el stream, SIN cambiar
+    // el status (para que el dashboard siga viendo la cama activa y refleje
+    // los valores que estamos transmitiendo).
+    if (wasSimulating) {
+      try {
+        await pauseSimulator(streamBedId, true, token)
+        setBeds(prev => prev.map(b => b.id === streamBedId ? { ...b, auto_simulate: false } : b))
+      } catch (err) {
+        console.error('No se pudo pausar el simulator:', err)
+      }
+    }
+
+    const snapshot  = { bedId: streamBedId, bpm, spo2, temperature }
     let   remaining = STREAM_DURATION
 
     setStreaming(true)
     setCountdown(remaining)
     setResponse(null)
 
+    const finish = async () => {
+      if (streamRef.current) {
+        clearInterval(streamRef.current)
+        streamRef.current = null
+      }
+      finishStreamRef.current = null
+      setStreaming(false)
+      setCountdown(0)
+
+      // Restaurar auto_simulate solo si estaba prendido antes
+      if (wasSimulating) {
+        try {
+          await pauseSimulator(streamBedId, false, token)
+          setBeds(prev => prev.map(b => b.id === streamBedId ? { ...b, auto_simulate: true } : b))
+        } catch (err) {
+          console.error('No se pudo restaurar el simulator:', err)
+        }
+      }
+    }
+
+    finishStreamRef.current = finish
+
     const doSend = async () => {
       try {
-        const result = await postVitals(snapshot)
+        const result = await postVitals(snapshot, token)
         setResponse(result)
       } catch (err) {
         setResponse({ error: err.message })
@@ -105,8 +207,7 @@ function Sender() {
       remaining -= 1
       setCountdown(remaining)
       if (remaining <= 0) {
-        clearInterval(streamRef.current)
-        setStreaming(false)
+        await finish()
       }
     }
 
@@ -114,18 +215,112 @@ function Sender() {
     streamRef.current = setInterval(doSend, 1000)
   }
 
-  const stopStream = () => {
-    clearInterval(streamRef.current)
-    setStreaming(false)
-    setCountdown(0)
+  const stopStream = async () => {
+    if (finishStreamRef.current) {
+      await finishStreamRef.current()
+    }
   }
 
-  const progress       = ((STREAM_DURATION - countdown) / STREAM_DURATION) * 100
-  const statusColor    = response
+  const toggleSimulate = async (id, enabled) => {
+    // Optimistic update: cuando se prende, status también pasa a 'active';
+    // cuando se apaga, a 'inactive'. Esto mantiene los botones consistentes.
+    setBeds(prev => prev.map(b =>
+      b.id === id
+        ? { ...b, auto_simulate: enabled, status: enabled ? 'active' : 'inactive' }
+        : b
+    ))
+    try {
+      await putSimulate(id, enabled, token)
+    } catch (err) {
+      console.error('toggleSimulate failed', err)
+      setBeds(prev => prev.map(b =>
+        b.id === id ? { ...b, auto_simulate: !enabled } : b
+      ))
+    }
+  }
+
+  const toggleAll = async (enabled) => {
+    setTogglingAll(true)
+    setBeds(prev => prev.map(b => ({ ...b, auto_simulate: enabled })))
+    try {
+      const res = await fetch(`${API_URL}/beds/simulate-all`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
+        body: JSON.stringify({ enabled }),
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    } catch (err) {
+      console.error('toggleAll failed', err)
+      await refreshBeds()
+    } finally {
+      setTogglingAll(false)
+    }
+  }
+
+  // Simula una falla de sensor: la cama pasa a status='disconnected'.
+  // NO toca auto_simulate — el switch sigue como estaba; el simulator deja de mandar
+  // porque filtra por status='active'.
+  const disconnectBed = async () => {
+    if (!bedId || loading || streaming) return
+    setLoading(true)
+    setResponse(null)
+    try {
+      const r = await fetch(`${API_URL}/beds/${bedId}/disconnect`, {
+        method:  'POST',
+        headers: authHeaders,
+      })
+      const data = await r.json()
+      setResponse({ status: r.status, data })
+      setBeds(prev => prev.map(b =>
+        b.id === Number(bedId) ? { ...b, status: 'disconnected' } : b
+      ))
+    } catch (err) {
+      setResponse({ error: err.message })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Reconecta la cama: vuelve a 'active' + auto_simulate=true
+  const reconnectBed = async () => {
+    if (!bedId || loading || streaming) return
+    setLoading(true)
+    setResponse(null)
+    try {
+      const r = await fetch(`${API_URL}/beds/${bedId}/reconnect`, {
+        method:  'POST',
+        headers: authHeaders,
+      })
+      const data = await r.json()
+      setResponse({ status: r.status, data })
+      setBeds(prev => prev.map(b =>
+        b.id === Number(bedId) ? { ...b, auto_simulate: true, status: 'active' } : b
+      ))
+    } catch (err) {
+      setResponse({ error: err.message })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const progress    = ((STREAM_DURATION - countdown) / STREAM_DURATION) * 100
+  const statusColor = response
     ? response.error || response.status >= 400
       ? 'bg-red-100 text-red-800 border-red-200'
       : 'bg-emerald-100 text-emerald-800 border-emerald-200'
     : ''
+
+  const filteredBeds = beds.filter((b) => {
+    const q = searchTerm.toLowerCase()
+    if (!q) return true
+    return (
+      b.code?.toLowerCase().includes(q) ||
+      (b.patient_name && b.patient_name.toLowerCase().includes(q))
+    )
+  })
+
+  const activeCount = beds.filter(b => b.auto_simulate).length
+  const selectedBed = beds.find(b => String(b.id) === String(bedId))
 
   return (
     <div className="max-w-2xl space-y-5">
@@ -203,21 +398,51 @@ function Sender() {
 
         {/* Action buttons */}
         {!streaming ? (
-          <div className="grid grid-cols-2 gap-3">
-            <button
-              onClick={send}
-              disabled={loading || !bedId}
-              className="bg-blue-600 text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-blue-700 active:bg-blue-800 disabled:opacity-50 disabled:cursor-not-allowed transition"
-            >
-              {loading ? 'Enviando…' : 'Enviar'}
-            </button>
-            <button
-              onClick={startStream}
-              disabled={!bedId}
-              className="bg-slate-800 text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-slate-700 active:bg-slate-900 disabled:opacity-50 disabled:cursor-not-allowed transition"
-            >
-              Transmitir 30s
-            </button>
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                onClick={send}
+                disabled={loading || !bedId}
+                className="bg-blue-600 text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-blue-700 active:bg-blue-800 disabled:opacity-50 disabled:cursor-not-allowed transition"
+              >
+                {loading ? 'Enviando…' : 'Enviar'}
+              </button>
+              <button
+                onClick={startStream}
+                disabled={!bedId}
+                className="bg-slate-800 text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-slate-700 active:bg-slate-900 disabled:opacity-50 disabled:cursor-not-allowed transition"
+              >
+                Transmitir 30s
+              </button>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                onClick={disconnectBed}
+                disabled={loading || !selectedBed || selectedBed.status !== 'active'}
+                title={
+                  !selectedBed ? 'Selecciona una cama'
+                  : selectedBed.status === 'disconnected' ? 'La cama ya está desconectada'
+                  : selectedBed.status === 'inactive' ? 'La cama está apagada (sube el switch primero)'
+                  : 'Simula que el sensor de esta cama falló'
+                }
+                className="bg-amber-600 text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-amber-700 active:bg-amber-800 disabled:opacity-50 disabled:cursor-not-allowed transition"
+              >
+                Desconectar sensor
+              </button>
+              <button
+                onClick={reconnectBed}
+                disabled={loading || !selectedBed || selectedBed.status !== 'disconnected'}
+                title={
+                  !selectedBed ? 'Selecciona una cama'
+                  : selectedBed.status === 'active' ? 'La cama ya está activa'
+                  : selectedBed.status === 'inactive' ? 'La cama está apagada (no hay nada que reconectar)'
+                  : 'Repara el sensor y reactiva el simulator'
+                }
+                className="bg-emerald-600 text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-emerald-700 active:bg-emerald-800 disabled:opacity-50 disabled:cursor-not-allowed transition"
+              >
+                Reconectar sensor
+              </button>
+            </div>
           </div>
         ) : (
           <div className="space-y-2.5">
@@ -239,6 +464,82 @@ function Sender() {
             </button>
           </div>
         )}
+      </div>
+
+      {/* Control del simulator */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-base font-bold text-slate-800">Control del simulator</h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Decide qué camas reciben datos automáticos del simulator.
+            </p>
+          </div>
+          <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-1 rounded-full whitespace-nowrap">
+            {activeCount} / {beds.length} activas
+          </span>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            onClick={() => toggleAll(true)}
+            disabled={togglingAll}
+            className="bg-emerald-600 text-white py-2 rounded-lg text-sm font-semibold hover:bg-emerald-700 disabled:opacity-50 transition"
+          >
+            Activar todas
+          </button>
+          <button
+            onClick={() => toggleAll(false)}
+            disabled={togglingAll}
+            className="bg-slate-600 text-white py-2 rounded-lg text-sm font-semibold hover:bg-slate-700 disabled:opacity-50 transition"
+          >
+            Desactivar todas
+          </button>
+        </div>
+
+        <input
+          type="text"
+          placeholder="Buscar por código o paciente…"
+          className={inputClass}
+          value={searchTerm}
+          onChange={e => setSearchTerm(e.target.value)}
+        />
+
+        <div className="border border-slate-200 rounded-lg divide-y divide-slate-100 max-h-96 overflow-y-auto">
+          {filteredBeds.length === 0 ? (
+            <p className="text-sm text-slate-400 text-center py-6">Sin resultados</p>
+          ) : (
+            filteredBeds.map(b => (
+              <div
+                key={b.id}
+                className={`flex items-center justify-between px-3 py-2.5 ${
+                  b.status === 'disconnected' ? 'bg-amber-50' : ''
+                }`}
+              >
+                <div className="min-w-0 mr-3">
+                  <p className="text-sm font-semibold text-slate-800 flex items-center gap-1.5">
+                    {b.code}
+                    {b.status === 'disconnected' && (
+                      <span
+                        className="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-amber-200 text-amber-900 animate-pulse"
+                        title="Sensor desconectado"
+                      >
+                        Desconectado
+                      </span>
+                    )}
+                  </p>
+                  <p className="text-xs text-slate-500 truncate">
+                    {b.patient_name || <span className="italic text-slate-400">Sin paciente</span>}
+                  </p>
+                </div>
+                <SimulatorToggle
+                  enabled={!!b.auto_simulate}
+                  onClick={() => toggleSimulate(b.id, !b.auto_simulate)}
+                />
+              </div>
+            ))
+          )}
+        </div>
       </div>
 
       {response && (
