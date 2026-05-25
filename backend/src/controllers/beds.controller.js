@@ -152,4 +152,59 @@ async function reconnect(req, res) {
   }
 }
 
-module.exports = { getAll, setSimulate, setSimulateAll, pauseSimulator, disconnect, reconnect };
+async function getDetails(req, res) {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(400).json({ error: 'invalid id' });
+  }
+  try {
+    const [patientResult, alertsResult] = await Promise.all([
+      pool.query(`
+        SELECT p.*, ba.assigned_at
+        FROM bed_assignments ba
+        JOIN patients p ON p.id = ba.patient_id
+        WHERE ba.bed_id = $1 AND ba.ended_at IS NULL
+        ORDER BY ba.assigned_at DESC
+        LIMIT 1
+      `, [id]),
+      pool.query(`
+        SELECT a.*, u.name AS acknowledged_by_name
+        FROM alerts a
+        LEFT JOIN users u ON u.id = a.acknowledged_by
+        WHERE a.bed_id = $1
+        ORDER BY a.triggered_at DESC
+        LIMIT 10
+      `, [id]),
+    ]);
+    res.json({
+      patient: patientResult.rows[0] ?? null,
+      alerts:  alertsResult.rows,
+    });
+  } catch (err) {
+    console.error('[BedsController] getDetails:', err.message);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
+async function getAlerts(req, res) {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(400).json({ error: 'invalid id' });
+  }
+  try {
+    const { rows } = await pool.query(`
+      SELECT a.*, u.name AS acknowledged_by_name
+      FROM alerts a
+      LEFT JOIN users u ON u.id = a.acknowledged_by
+      WHERE a.bed_id = $1
+      ORDER BY a.triggered_at DESC
+      LIMIT 50
+    `, [id]);
+    res.json(rows);
+  } catch (err) {
+    console.error('[BedsController] getAlerts:', err.message);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
+module.exports = { getAll, setSimulate, setSimulateAll, pauseSimulator, disconnect, reconnect, getDetails, getAlerts };

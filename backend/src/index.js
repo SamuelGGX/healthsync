@@ -40,11 +40,13 @@ io.use((socket, next) => {
 
 const auth = require('./middleware/auth');
 
-app.use('/auth',   require('./routes/auth'));
-app.use('/users',  require('./routes/users'));
-app.use('/beds',   auth, require('./routes/beds'));
-app.use('/vitals', auth, require('./routes/vitals'));
-app.use('/admin',  auth, require('./routes/admin'));
+app.use('/auth',            require('./routes/auth'));
+app.use('/users',           require('./routes/users'));
+app.use('/beds',            auth, require('./routes/beds'));
+app.use('/vitals',          auth, require('./routes/vitals'));
+app.use('/admin',           auth, require('./routes/admin'));
+app.use('/patients',        auth, require('./routes/patients'));
+app.use('/bed-assignments', auth, require('./routes/bed-assignments'));
 
 app.get('/health', async (req, res) => {
   try {
