@@ -32,11 +32,16 @@ export default function Patients() {
   const [loading, setLoading]       = useState(true)
   const [search, setSearch]         = useState('')
   const [filter, setFilter]         = useState('all')   // all | active | discharged
+  const [page, setPage]             = useState(1)
   const [showCreate, setShowCreate] = useState(false)
   const [createError, setCreateError] = useState(null)
   const [creating, setCreating]     = useState(false)
 
+  const PAGE_SIZE = 25
+
   const canCreate = user?.role === 'admin' || user?.role === 'medico'
+
+  useEffect(() => { setPage(1) }, [search, filter])
 
   const load = () => {
     setLoading(true)
@@ -86,6 +91,12 @@ export default function Patients() {
     const matchFilter = filter === 'all' || (filter === 'active' ? !p.discharged_at : !!p.discharged_at)
     return matchSearch && matchFilter
   })
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const safePage   = Math.min(page, totalPages)
+  const paginated  = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
+
+  const goToPage = (p) => setPage(Math.max(1, Math.min(p, totalPages)))
 
   return (
     <div className="space-y-5">
@@ -177,7 +188,7 @@ export default function Patients() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
-              {filtered.map(p => (
+              {paginated.map(p => (
                 <tr
                   key={p.id}
                   onClick={() => navigate(`/patients/${p.id}`)}
@@ -217,8 +228,53 @@ export default function Patients() {
               ))}
             </tbody>
           </table>
-          <div className="px-4 py-2 bg-slate-50 border-t border-slate-100 text-xs text-slate-400">
-            Mostrando {filtered.length} de {patients.length} pacientes
+          <div className="px-4 py-3 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-3 flex-wrap">
+            <span className="text-xs text-slate-400">
+              Mostrando {(safePage - 1) * PAGE_SIZE + 1}–{Math.min(safePage * PAGE_SIZE, filtered.length)} de {filtered.length} pacientes
+            </span>
+            {totalPages > 1 && (
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => goToPage(safePage - 1)}
+                  disabled={safePage === 1}
+                  className="px-2 py-1 rounded text-xs font-medium text-slate-500 hover:text-slate-700 hover:bg-slate-200 disabled:opacity-30 disabled:cursor-not-allowed transition"
+                >
+                  ‹ Anterior
+                </button>
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                  .filter(n => n === 1 || n === totalPages || Math.abs(n - safePage) <= 1)
+                  .reduce((acc, n, idx, arr) => {
+                    if (idx > 0 && n - arr[idx - 1] > 1) acc.push('…')
+                    acc.push(n)
+                    return acc
+                  }, [])
+                  .map((n, i) =>
+                    n === '…' ? (
+                      <span key={`ellipsis-${i}`} className="px-1 text-xs text-slate-400">…</span>
+                    ) : (
+                      <button
+                        key={n}
+                        onClick={() => goToPage(n)}
+                        className={`w-7 h-7 rounded text-xs font-semibold transition ${
+                          n === safePage
+                            ? 'bg-emerald-600 text-white shadow-sm'
+                            : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200'
+                        }`}
+                      >
+                        {n}
+                      </button>
+                    )
+                  )
+                }
+                <button
+                  onClick={() => goToPage(safePage + 1)}
+                  disabled={safePage === totalPages}
+                  className="px-2 py-1 rounded text-xs font-medium text-slate-500 hover:text-slate-700 hover:bg-slate-200 disabled:opacity-30 disabled:cursor-not-allowed transition"
+                >
+                  Siguiente ›
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
