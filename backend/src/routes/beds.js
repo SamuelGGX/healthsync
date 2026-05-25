@@ -2,7 +2,9 @@ const express = require('express');
 const router = express.Router();
 const bedsController = require('../controllers/beds.controller');
 
-router.get('/', bedsController.getAll);
+router.get('/',             bedsController.getAll);
+router.get('/:id/details',  bedsController.getDetails);
+router.get('/:id/alerts',   bedsController.getAlerts);
 router.put('/simulate-all',         bedsController.setSimulateAll);
 router.put('/:id/simulate',         bedsController.setSimulate);
 router.put('/:id/simulator-pause',  bedsController.pauseSimulator);

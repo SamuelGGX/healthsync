@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { io } from 'socket.io-client'
 import { useAuth } from '../context/AuthContext'
+import BedDetailsPanel from '../components/BedDetailsPanel'
 
 const API_URL = `http://${window.location.hostname}:3000`
 
@@ -118,12 +119,13 @@ function StatusBadge({ status, alertType }) {
   )
 }
 
-function BedCard({ bed }) {
+function BedCard({ bed, onClick }) {
   const isAlert        = bed.status === 'alert'
   const isNormal       = bed.status === 'normal'
   const isInactive     = bed.status === 'inactive'
   const isDisconnected = bed.status === 'disconnected'
   const hasData        = bed.bpm !== undefined
+  const isVacant       = !bed.patientName
 
   const bpmAbnormal  = isAlert && hasData && (bed.bpm > 150 || bed.bpm < 40)
   const spo2Abnormal = isAlert && hasData && bed.spo2 < 90
@@ -135,12 +137,15 @@ function BedCard({ bed }) {
 
   return (
     <div
+      onClick={onClick}
       className={[
         'rounded-2xl border-2 p-4 transition-all duration-500 flex flex-col gap-3',
-        isAlert        ? 'border-red-400 bg-red-50'                         : '',
-        isNormal       ? 'border-emerald-200 bg-white shadow-sm'           : '',
-        isDisconnected ? 'border-amber-400 bg-amber-50 alert-pulse'        : '',
-        isInactive     ? 'border-slate-200 bg-slate-50 opacity-70'         : '',
+        isVacant                         ? 'border-dashed border-slate-300 bg-slate-50 opacity-60 hover:opacity-90' : '',
+        !isVacant && isAlert             ? 'border-red-400 bg-red-50'                                              : '',
+        !isVacant && isNormal            ? 'border-emerald-200 bg-white shadow-sm'                                 : '',
+        !isVacant && isDisconnected      ? 'border-amber-400 bg-amber-50 alert-pulse'                              : '',
+        !isVacant && isInactive          ? 'border-slate-200 bg-slate-50 opacity-70'                               : '',
+        onClick                          ? 'cursor-pointer hover:shadow-md'                                        : '',
       ].filter(Boolean).join(' ')}
     >
       <div className="flex items-start justify-between gap-2">
@@ -151,7 +156,9 @@ function BedCard({ bed }) {
               {bed.patientName}
             </span>
           ) : (
-            <span className="text-[11px] text-slate-400 italic">Sin paciente</span>
+            <span className="text-[11px] font-semibold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded-full inline-block">
+              Disponible
+            </span>
           )}
         </div>
         <StatusBadge status={bed.status} alertType={bed.alertType} />
@@ -249,6 +256,7 @@ export default function Dashboard() {
   const [tick, setTick]             = useState(0)
   const [soundEnabled, setSoundEnabled] = useState(false)
   const [muted, setMuted]           = useState(false)
+  const [selectedBedId, setSelectedBedId] = useState(null)
   const audioCtxRef                 = useRef(null)
   const mutedRef                    = useRef(false)
 
@@ -396,6 +404,29 @@ export default function Dashboard() {
     sensorError:  bedList.filter(b => b.sensorError).length,
   }
 
+  const refreshBeds = () => {
+    fetch(`${API_URL}/beds`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+      .then(r => r.json())
+      .then(data => {
+        setBeds(prev => {
+          const next = { ...prev }
+          data.forEach(b => {
+            if (next[b.id]) {
+              next[b.id] = {
+                ...next[b.id],
+                patientName:      b.patient_name      ?? null,
+                patientBloodType: b.patient_blood_type ?? null,
+              }
+            }
+          })
+          return next
+        })
+      })
+      .catch(console.error)
+  }
+
   void tick
 
   return (
@@ -447,9 +478,19 @@ export default function Dashboard() {
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
           {bedList.map(bed => (
-            <BedCard key={bed.id} bed={bed} />
+            <BedCard key={bed.id} bed={bed} onClick={() => setSelectedBedId(bed.id)} />
           ))}
         </div>
+      )}
+
+      {selectedBedId && beds[selectedBedId] && (
+        <BedDetailsPanel
+          bedId={selectedBedId}
+          bedCode={beds[selectedBedId].code}
+          bed={beds[selectedBedId]}
+          onClose={() => setSelectedBedId(null)}
+          onPatientChanged={refreshBeds}
+        />
       )}
     </div>
   )
