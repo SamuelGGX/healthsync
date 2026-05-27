@@ -55,12 +55,34 @@ services:
       - "80:80"
     depends_on:
       - backend
+      - munin
     networks:
       - healthsync-net
     restart: unless-stopped
 
+  munin:
+    build: ./munin
+    depends_on:
+      - backend
+    networks:
+      - healthsync-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8081/munin/ >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    volumes:
+      - munin-db:/var/lib/munin
+      - munin-cache:/var/cache/munin
+      - munin-log:/var/log/munin
+
 volumes:
   pgdata:
+  munin-db:
+  munin-cache:
+  munin-log:
 
 networks:
   healthsync-net:
