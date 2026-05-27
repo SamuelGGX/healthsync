@@ -34,6 +34,13 @@ async function create(req, res) {
   }
   try {
     const patient = await repo.insert({ full_name, document_id, birth_date, blood_type });
+    await audit.log({
+      user_id:    req.user.id,
+      action:     'CREATE',
+      table_name: 'patients',
+      record_id:  patient.id,
+      new_value:  { full_name: patient.full_name, document_id: patient.document_id },
+    });
     res.status(201).json(patient);
   } catch (err) {
     if (err.code === '23505') {
@@ -54,6 +61,13 @@ async function update(req, res) {
   try {
     const patient = await repo.update(id, { full_name, document_id, birth_date, blood_type });
     if (!patient) return res.status(404).json({ error: 'Paciente no encontrado' });
+    await audit.log({
+      user_id:    req.user.id,
+      action:     'UPDATE',
+      table_name: 'patients',
+      record_id:  id,
+      new_value:  { full_name, document_id, birth_date, blood_type },
+    });
     res.json(patient);
   } catch (err) {
     if (err.code === '23505') {

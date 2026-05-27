@@ -35,7 +35,7 @@ function fmtDate(iso) {
 }
 
 function fmtValue(raw) {
-  if (!raw) return '—'
+  if (!raw) return null
   try {
     const obj = JSON.parse(raw)
     return Object.entries(obj)
@@ -44,6 +44,33 @@ function fmtValue(raw) {
   } catch {
     return raw
   }
+}
+
+function ValueCell({ row }) {
+  if (row.action === 'UPDATE' && row.old_value && row.new_value) {
+    return (
+      <div className="space-y-1">
+        <div className="flex items-start gap-1.5">
+          <span className="text-[10px] font-semibold text-slate-400 uppercase mt-0.5 w-6 flex-shrink-0">ant</span>
+          <span className="text-slate-400 line-through truncate text-xs" title={fmtValue(row.old_value)}>
+            {fmtValue(row.old_value)}
+          </span>
+        </div>
+        <div className="flex items-start gap-1.5">
+          <span className="text-[10px] font-semibold text-emerald-500 uppercase mt-0.5 w-6 flex-shrink-0">new</span>
+          <span className="text-slate-600 truncate text-xs" title={fmtValue(row.new_value)}>
+            {fmtValue(row.new_value)}
+          </span>
+        </div>
+      </div>
+    )
+  }
+  const val = fmtValue(row.new_value ?? row.old_value)
+  return (
+    <span className="text-slate-500 truncate text-xs" title={val ?? ''}>
+      {val ?? '—'}
+    </span>
+  )
 }
 
 export default function AuditLogs() {
@@ -72,7 +99,7 @@ export default function AuditLogs() {
       params.set('limit',  PAGE_SIZE)
       params.set('offset', page * PAGE_SIZE)
 
-      const res  = await fetch(`${API_URL}/audit?${params.toString()}`, {
+      const res  = await fetch(`${API_URL}/admin/audit-logs?${params.toString()}`, {
         headers: { Authorization: `Bearer ${token}` },
       })
       const data = await res.json()
@@ -166,7 +193,7 @@ export default function AuditLogs() {
                 <th className="px-4 py-3">Acción</th>
                 <th className="px-4 py-3">Tabla</th>
                 <th className="px-4 py-3">Registro</th>
-                <th className="px-4 py-3">Detalle</th>
+                <th className="px-4 py-3">Valor</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -179,8 +206,9 @@ export default function AuditLogs() {
                   <tr key={r.id} className="hover:bg-slate-50">
                     <td className="px-4 py-3 whitespace-nowrap text-slate-600 tabular-nums">{fmtDate(r.occurred_at)}</td>
                     <td className="px-4 py-3 whitespace-nowrap">
-                      <span className="font-medium text-slate-800">{r.user_name ?? `#${r.user_id}`}</span>
-                      {r.user_role && <span className="ml-1 text-xs text-slate-400">({r.user_role})</span>}
+                      <div className="font-medium text-slate-800 text-sm">{r.user_name ?? `#${r.user_id}`}</div>
+                      {r.user_email && <div className="text-xs text-slate-400">{r.user_email}</div>}
+                      {r.user_role  && <div className="text-[11px] text-slate-300">{r.user_role}</div>}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${ACTION_COLORS[r.action] ?? 'bg-slate-100 text-slate-600'}`}>
@@ -189,8 +217,8 @@ export default function AuditLogs() {
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-slate-600">{r.table_name}</td>
                     <td className="px-4 py-3 whitespace-nowrap text-slate-500">{r.record_id ?? '—'}</td>
-                    <td className="px-4 py-3 text-slate-500 max-w-xs truncate" title={fmtValue(r.new_value)}>
-                      {fmtValue(r.new_value)}
+                    <td className="px-4 py-3 max-w-xs">
+                      <ValueCell row={r} />
                     </td>
                   </tr>
                 ))

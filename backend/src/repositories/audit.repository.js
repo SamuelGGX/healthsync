@@ -37,7 +37,7 @@ async function findAll({ action, table_name, user_id, from, to, limit = 50, offs
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
 
   const { rows } = await db.query(
-    `SELECT a.id, a.user_id, u.name AS user_name, u.role AS user_role,
+    `SELECT a.id, a.user_id, u.name AS user_name, u.email AS user_email, u.role AS user_role,
             a.action, a.table_name, a.record_id, a.old_value, a.new_value, a.occurred_at
      FROM audit_log a
      LEFT JOIN users u ON u.id = a.user_id
