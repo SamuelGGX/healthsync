@@ -9,6 +9,7 @@ import SlowQueries from './pages/SlowQueries'
 import Uptime from './pages/Uptime'
 import Patients from './pages/Patients'
 import PatientDetail from './pages/PatientDetail'
+import AuditLogs from './pages/AuditLogs'
 
 function PulseIcon() {
   return (
@@ -51,6 +52,7 @@ function AppLayout() {
             {isAdmin && <NavLink to="/create-user" className={navLink}>Crear usuario</NavLink>}
             {isAdmin && <NavLink to="/slow-queries" className={navLink}>Slow Queries</NavLink>}
             {isAdmin && <NavLink to="/uptime" className={navLink}>Uptime</NavLink>}
+            {isAdmin && <NavLink to="/audit" className={navLink}>Auditoría</NavLink>}
           </div>
 
           {user && (
@@ -106,6 +108,11 @@ function AppLayout() {
           <Route path="/patients/:id" element={
             <ProtectedRoute>
               <PatientDetail />
+            </ProtectedRoute>
+          } />
+          <Route path="/audit" element={
+            <ProtectedRoute roles={['admin']}>
+              <AuditLogs />
             </ProtectedRoute>
           } />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
