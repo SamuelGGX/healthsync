@@ -76,7 +76,7 @@ CREATE TABLE alerts (
 CREATE TABLE audit_log (
     id          BIGSERIAL PRIMARY KEY,
     user_id     INT         NOT NULL REFERENCES users(id),
-    action      VARCHAR(20) NOT NULL CHECK (action IN ('CREATE', 'UPDATE', 'DELETE')),
+    action      VARCHAR(20) NOT NULL CHECK (action IN ('CREATE', 'UPDATE', 'DELETE', 'LOGIN', 'LOGOUT', 'BED_ASSIGN', 'BED_RELEASE')),
     table_name  VARCHAR(50) NOT NULL,
     record_id   VARCHAR(50),
     old_value   TEXT,

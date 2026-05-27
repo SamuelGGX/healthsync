@@ -95,4 +95,17 @@ async function discharge(id) {
   }
 }
 
-module.exports = { findAll, findById, insert, update, discharge };
+// Re-admitir: solo aplica a un paciente que ESTÉ dado de alta.
+// Resetea discharged_at y pone una nueva fecha de admisión.
+async function readmit(id) {
+  const { rows } = await db.query(
+    `UPDATE patients
+     SET admitted_at = NOW(), discharged_at = NULL
+     WHERE id = $1 AND discharged_at IS NOT NULL
+     RETURNING *`,
+    [id]
+  );
+  return rows[0] ?? null;
+}
+
+module.exports = { findAll, findById, insert, update, discharge, readmit };

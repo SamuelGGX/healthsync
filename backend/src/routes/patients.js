@@ -9,5 +9,6 @@ router.get('/:id',           ctrl.getOne);
 router.post('/',             requireRole('admin', 'medico'), ctrl.create);
 router.put('/:id',           requireRole('admin', 'medico'), verifyPassword, ctrl.update);
 router.put('/:id/discharge', requireRole('medico'),          verifyPassword, ctrl.discharge);
+router.put('/:id/readmit',   requireRole('admin', 'medico'), ctrl.readmit);
 
 module.exports = router;
