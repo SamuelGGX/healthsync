@@ -69,9 +69,18 @@ async function discharge(req, res) {
     return res.status(400).json({ error: 'id inválido' });
   }
   try {
-    const patient = await repo.discharge(id);
-    if (!patient) return res.status(409).json({ error: 'El paciente ya fue dado de alta' });
-    res.json(patient);
+    const result = await repo.discharge(id);
+    if (!result) return res.status(409).json({ error: 'El paciente ya fue dado de alta' });
+
+    // Avisar al dashboard que las camas liberadas quedaron apagadas
+    const io = req.app.get('io');
+    if (io) {
+      for (const bedId of result.freedBedIds) {
+        io.emit('bed_status', { bed_id: bedId, status: 'inactive' });
+      }
+    }
+
+    res.json(result.patient);
   } catch (err) {
     console.error('[PatientsController] discharge:', err.message);
     res.status(500).json({ error: 'Error interno' });

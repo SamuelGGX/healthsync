@@ -14,6 +14,11 @@ async function insert({ bed_id, patient_id, assigned_user_id }) {
      VALUES ($1, $2, $3) RETURNING *`,
     [bed_id, patient_id, assigned_user_id]
   );
+
+  await db.query(
+    `UPDATE beds SET auto_simulate = TRUE, status = 'active' WHERE id = $1`,
+    [bed_id]
+  );
   return rows[0];
 }
 
@@ -24,6 +29,13 @@ async function end(id) {
      RETURNING *`,
     [id]
   );
+  if (rows[0]) {
+    // Cama liberada -> apagar monitoreo
+    await db.query(
+      `UPDATE beds SET auto_simulate = FALSE, status = 'inactive' WHERE id = $1`,
+      [rows[0].bed_id]
+    );
+  }
   return rows[0] ?? null;
 }
 

@@ -1,4 +1,5 @@
 const repo = require('../repositories/bed-assignments.repository');
+const { notifyReconnect } = require('../services/stale-beds-monitor');
 
 async function assign(req, res) {
   const { bed_id, patient_id } = req.body ?? {};
@@ -15,6 +16,13 @@ async function assign(req, res) {
       patient_id:       Number(patient_id),
       assigned_user_id: req.user.id,
     });
+
+    // Avisar al dashboard que la cama ahora está activa, y dar gracia al
+    // stale-monitor para que no la marque disconnected antes del primer vital.
+    const io = req.app.get('io');
+    if (io) io.emit('bed_status', { bed_id: Number(bed_id), status: 'active' });
+    notifyReconnect(Number(bed_id));
+
     res.status(201).json(assignment);
   } catch (err) {
     console.error('[BedAssignmentsController] assign:', err.message);
@@ -30,6 +38,11 @@ async function end(req, res) {
   try {
     const assignment = await repo.end(id);
     if (!assignment) return res.status(404).json({ error: 'Asignación no encontrada o ya cerrada' });
+
+    // Cama liberada -> avisar al dashboard que quedó apagada
+    const io = req.app.get('io');
+    if (io) io.emit('bed_status', { bed_id: assignment.bed_id, status: 'inactive' });
+
     res.json(assignment);
   } catch (err) {
     console.error('[BedAssignmentsController] end:', err.message);
