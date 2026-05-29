@@ -43,8 +43,12 @@ export default function PatientDetail() {
   const [dischargeError, setDischargeError]           = useState(null)
   const [dischargeLoading, setDischargeLoading]       = useState(false)
 
+  const [readmitError, setReadmitError]     = useState(null)
+  const [readmitLoading, setReadmitLoading] = useState(false)
+
   const canEdit      = user?.role === 'admin' || user?.role === 'medico'
   const canDischarge = user?.role === 'medico'
+  const canReadmit   = user?.role === 'admin' || user?.role === 'medico'
 
   const load = () => {
     setLoading(true)
@@ -99,6 +103,21 @@ export default function PatientDetail() {
       load()
     } catch { setDischargeError('Error de conexión') }
     finally   { setDischargeLoading(false) }
+  }
+
+  const handleReadmit = async () => {
+    setReadmitLoading(true)
+    setReadmitError(null)
+    try {
+      const res = await fetch(`${API_URL}/patients/${id}/readmit`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const json = await res.json()
+      if (!res.ok) { setReadmitError(json.error ?? 'Error al re-admitir'); return }
+      load()
+    } catch { setReadmitError('Error de conexión') }
+    finally   { setReadmitLoading(false) }
   }
 
   if (loading) {
@@ -235,6 +254,31 @@ export default function PatientDetail() {
                 </svg>
                 Dar de alta
               </button>
+            </div>
+          </div>
+        )}
+
+        {/* Readmit button (solo si el paciente está dado de alta) */}
+        {!editing && canReadmit && patient.discharged_at && (
+          <div className="px-5 pb-5">
+            <div className="border-t border-slate-100 pt-4">
+              {readmitError && (
+                <p className="text-xs text-red-600 mb-2">{readmitError}</p>
+              )}
+              <button
+                onClick={handleReadmit}
+                disabled={readmitLoading}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                  <path d="M3 3v5h5"/>
+                </svg>
+                {readmitLoading ? 'Re-admitiendo…' : 'Re-admitir paciente'}
+              </button>
+              <p className="text-xs text-slate-400 mt-2">
+                Vuelve a ingresar al paciente. Quedará disponible para asignarle una cama.
+              </p>
             </div>
           </div>
         )}

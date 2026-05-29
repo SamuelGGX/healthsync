@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useAuth } from '../context/AuthContext'
+import { ConfirmModal } from '../components/Modal'
 
 const API_URL = `http://${window.location.hostname}:3000`
 
@@ -34,6 +35,7 @@ export default function SlowQueries() {
   const [error, setError]         = useState(null)
   const [resetting, setResetting] = useState(false)
   const [resetMsg, setResetMsg]   = useState(null)
+  const [confirmReset, setConfirmReset] = useState(false)
   const [autoRefresh, setAutoRefresh] = useState(false)
   const [countdown, setCountdown]     = useState(15)
 
@@ -81,7 +83,7 @@ export default function SlowQueries() {
   }, [autoRefresh, load])
 
   const reset = async () => {
-    if (!confirm('¿Resetear todas las estadísticas de pg_stat_statements?')) return
+    setConfirmReset(false)
     setResetting(true)
     setResetMsg(null)
     try {
@@ -130,7 +132,7 @@ export default function SlowQueries() {
             {loading ? 'Cargando…' : 'Actualizar'}
           </button>
           <button
-            onClick={reset}
+            onClick={() => setConfirmReset(true)}
             disabled={resetting}
             className="text-xs px-3 py-1.5 rounded-lg bg-red-50 border border-red-200 text-red-600 hover:bg-red-100 disabled:opacity-50 transition"
           >
@@ -199,6 +201,17 @@ export default function SlowQueries() {
           </div>
         )}
       </div>
+
+      {confirmReset && (
+        <ConfirmModal
+          title="Resetear estadísticas"
+          message="¿Resetear todas las estadísticas de pg_stat_statements? Esta acción no se puede deshacer."
+          confirmLabel="Resetear"
+          danger
+          onConfirm={reset}
+          onClose={() => setConfirmReset(false)}
+        />
+      )}
     </div>
   )
 }

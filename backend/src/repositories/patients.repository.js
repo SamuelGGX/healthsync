@@ -71,13 +71,22 @@ async function discharge(id) {
       await client.query('ROLLBACK');
       return null;
     }
-    await client.query(
+    // Cerrar la asignación activa y saber qué cama(s) quedan libres
+    const { rows: freed } = await client.query(
       `UPDATE bed_assignments SET ended_at = NOW()
-       WHERE patient_id = $1 AND ended_at IS NULL`,
+       WHERE patient_id = $1 AND ended_at IS NULL
+       RETURNING bed_id`,
       [id]
     );
+    // Apagar el monitoreo de las camas liberadas (ya no hay paciente)
+    for (const a of freed) {
+      await client.query(
+        `UPDATE beds SET auto_simulate = FALSE, status = 'inactive' WHERE id = $1`,
+        [a.bed_id]
+      );
+    }
     await client.query('COMMIT');
-    return rows[0];
+    return { patient: rows[0], freedBedIds: freed.map(a => a.bed_id) };
   } catch (err) {
     await client.query('ROLLBACK');
     throw err;
@@ -86,4 +95,17 @@ async function discharge(id) {
   }
 }
 
-module.exports = { findAll, findById, insert, update, discharge };
+// Re-admitir: solo aplica a un paciente que ESTÉ dado de alta.
+// Resetea discharged_at y pone una nueva fecha de admisión.
+async function readmit(id) {
+  const { rows } = await db.query(
+    `UPDATE patients
+     SET admitted_at = NOW(), discharged_at = NULL
+     WHERE id = $1 AND discharged_at IS NOT NULL
+     RETURNING *`,
+    [id]
+  );
+  return rows[0] ?? null;
+}
+
+module.exports = { findAll, findById, insert, update, discharge, readmit };

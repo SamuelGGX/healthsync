@@ -1,6 +1,7 @@
 const bcrypt = require('bcryptjs');
 const jwt    = require('jsonwebtoken');
 const users  = require('../repositories/users.repository');
+const audit  = require('../repositories/audit.repository');
 
 const ACCESS_TOKEN_EXPIRY  = '30m';
 const REFRESH_TOKEN_EXPIRY = '12h';
@@ -40,6 +41,14 @@ async function login(req, res) {
 
     // Guardar el refresh en la BD para poder revocarlo en /logout
     await users.updateRefreshToken(user.id, refreshToken);
+
+    await audit.log({
+      user_id:    user.id,
+      action:     'LOGIN',
+      table_name: 'users',
+      record_id:  user.id,
+      new_value:  { email: user.email, role: user.role },
+    });
 
     return res.json({
       accessToken,
@@ -101,6 +110,12 @@ async function logout(req, res) {
   try {
     if (payload?.type === 'refresh' && payload.id) {
       await users.updateRefreshToken(payload.id, null);
+      await audit.log({
+        user_id:    payload.id,
+        action:     'LOGOUT',
+        table_name: 'users',
+        record_id:  payload.id,
+      });
     }
     return res.status(204).end();
   } catch (err) {

@@ -47,6 +47,7 @@ app.use('/vitals',          auth, require('./routes/vitals'));
 app.use('/admin',           auth, require('./routes/admin'));
 app.use('/patients',        auth, require('./routes/patients'));
 app.use('/bed-assignments', auth, require('./routes/bed-assignments'));
+app.use('/audit',           auth, require('./routes/audit'));
 
 app.get('/health', async (req, res) => {
   try {
