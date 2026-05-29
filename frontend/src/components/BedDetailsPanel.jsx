@@ -4,8 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import PasswordPrompt from './PasswordPrompt'
 import AssignBedModal from './AssignBedModal'
 import WaveformCanvas from './WaveformCanvas'
-
-const API_URL = `http://${window.location.hostname}:3000`
+import { API_URL } from '../config'
 
 const ALERT_LABELS = {
   tachycardia: 'Taquicardia',

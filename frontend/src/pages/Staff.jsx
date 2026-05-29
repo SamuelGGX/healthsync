@@ -2,8 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../components/Toast'
 import Modal from '../components/Modal'
-
-const API_URL = `http://${window.location.hostname}:3000`
+import { API_URL } from '../config'
 
 const ROLES = ['medico', 'enfermero']
 const ROLE_LABEL = { medico: 'Médico', enfermero: 'Enfermero' }

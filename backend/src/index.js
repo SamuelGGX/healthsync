@@ -15,7 +15,7 @@ let staleMonitor = null;
 
 const PORT = process.env.BACKEND_PORT || 3000;
 
-app.use(cors());
+app.use(cors({ origin: process.env.CORS_ORIGIN || '*' }));
 app.use(express.json());
 
 app.set('io', io);

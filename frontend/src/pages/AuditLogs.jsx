@@ -1,7 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useAuth } from '../context/AuthContext'
-
-const API_URL = `http://${window.location.hostname}:3000`
+import { API_URL } from '../config'
 const PAGE_SIZE = 25
 
 const ACTION_LABELS = {
