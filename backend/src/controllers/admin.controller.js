@@ -1,5 +1,6 @@
 const adminRepository = require('../repositories/admin.repository');
 const audit           = require('../repositories/audit.repository');
+const sensorLogs      = require('../repositories/sensor_logs.repository');
 
 async function getSlowQueries(req, res) {
   try {
@@ -120,6 +121,25 @@ async function getAuditLogs(req, res) {
   }
 }
 
+async function getSensorLogs(req, res) {
+  const { event, bed_id, from, to, search, limit = 50, offset = 0 } = req.query;
+  try {
+    const result = await sensorLogs.findAll({
+      event,
+      bed_id: bed_id ? Number(bed_id) : undefined,
+      from,
+      to,
+      search,
+      limit:  Math.min(Number(limit)  || 50, 200),
+      offset: Number(offset) || 0,
+    });
+    res.json(result);
+  } catch (err) {
+    console.error('[AdminController] getSensorLogs:', err.message);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
 module.exports = {
   getSlowQueries,
   resetStats,
@@ -127,4 +147,5 @@ module.exports = {
   getPingdomUptime,
   getPingdomOutages,
   getAuditLogs,
+  getSensorLogs,
 };

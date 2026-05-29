@@ -10,6 +10,7 @@ import Uptime from './pages/Uptime'
 import Patients from './pages/Patients'
 import PatientDetail from './pages/PatientDetail'
 import AuditLogs from './pages/AuditLogs'
+import SensorLogs from './pages/SensorLogs'
 import Staff from './pages/Staff'
 
 function PulseIcon() {
@@ -55,6 +56,7 @@ function AppLayout() {
             {isAdmin && <NavLink to="/uptime" className={navLink}>Uptime</NavLink>}
             {isAdmin && <NavLink to="/staff" className={navLink}>Personal</NavLink>}
             {isAdmin && <NavLink to="/audit" className={navLink}>Auditoría</NavLink>}
+            {isAdmin && <NavLink to="/sensor-logs" className={navLink}>Sensores</NavLink>}
           </div>
 
           {user && (
@@ -120,6 +122,11 @@ function AppLayout() {
           <Route path="/audit" element={
             <ProtectedRoute roles={['admin']}>
               <AuditLogs />
+            </ProtectedRoute>
+          } />
+          <Route path="/sensor-logs" element={
+            <ProtectedRoute roles={['admin']}>
+              <SensorLogs />
             </ProtectedRoute>
           } />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />

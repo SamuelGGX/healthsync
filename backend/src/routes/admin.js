@@ -12,4 +12,6 @@ router.get('/pingdom/outages/:checkId', requireRole('admin'), adminController.ge
 
 router.get('/audit-logs', requireRole('admin'), adminController.getAuditLogs);
 
+router.get('/sensor-logs', requireRole('admin'), adminController.getSensorLogs);
+
 module.exports = router;
