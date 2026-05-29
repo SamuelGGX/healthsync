@@ -1,12 +1,13 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../components/Toast'
-import Modal, { ConfirmModal } from '../components/Modal'
+import Modal from '../components/Modal'
 
 const API_URL = `http://${window.location.hostname}:3000`
 
 const ROLES = ['medico', 'enfermero']
 const ROLE_LABEL = { medico: 'Médico', enfermero: 'Enfermero' }
+const PAGE_SIZE = 10
 
 function UserIcon() {
   return (
@@ -20,14 +21,6 @@ function EditIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
       <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
-    </svg>
-  )
-}
-
-function TrashIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-      <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
     </svg>
   )
 }
@@ -112,7 +105,8 @@ export default function Staff() {
   const [tab,       setTab]           = useState('medico')
   const [modal,     setModal]         = useState(null) // null | 'create' | user object (edit)
   const [saving,    setSaving]        = useState(false)
-  const [deleteId,  setDeleteId]      = useState(null)
+  const [search,    setSearch]        = useState('')
+  const [page,      setPage]          = useState(0)
 
   const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
 
@@ -155,17 +149,16 @@ export default function Staff() {
     finally { setSaving(false) }
   }
 
-  const handleDelete = async (id) => {
-    try {
-      const res = await fetch(`${API_URL}/users/${id}`, { method: 'DELETE', headers })
-      if (!res.ok) { const d = await res.json(); toast({ message: d.error || 'Error al eliminar', type: 'error' }); return }
-      setUsers(prev => prev.filter(u => u.id !== id))
-      toast({ message: 'Usuario eliminado', type: 'success' })
-    } catch { toast({ message: 'Error de red', type: 'error' }) }
-    finally { setDeleteId(null) }
-  }
+  const q = search.trim().toLowerCase()
+  const filtered = users.filter(u =>
+    u.role === tab &&
+    (q === '' || u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q))
+  )
 
-  const filtered = users.filter(u => u.role === tab)
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE)
+  const paged      = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
+  const fromRow    = filtered.length === 0 ? 0 : page * PAGE_SIZE + 1
+  const toRow      = Math.min((page + 1) * PAGE_SIZE, filtered.length)
 
   return (
     <div>
@@ -191,7 +184,7 @@ export default function Staff() {
       <div className="flex gap-1 mb-4 border-b border-slate-200">
         {ROLES.map(r => (
           <button key={r}
-            onClick={() => setTab(r)}
+            onClick={() => { setTab(r); setPage(0) }}
             className={`px-4 py-2 text-sm font-medium transition border-b-2 -mb-px ${
               tab === r
                 ? 'border-slate-800 text-slate-800'
@@ -203,6 +196,23 @@ export default function Staff() {
         ))}
       </div>
 
+      {/* Búsqueda */}
+      <div className="mb-4 relative">
+        <svg
+          className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+          width="16" height="16" viewBox="0 0 24 24" fill="currentColor"
+        >
+          <path d="M15.5 14h-.79l-.28-.27a6.5 6.5 0 1 0-.7.7l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0A4.5 4.5 0 1 1 14 9.5 4.5 4.5 0 0 1 9.5 14z"/>
+        </svg>
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => { setSearch(e.target.value); setPage(0) }}
+          placeholder="Buscar por nombre o email…"
+          className="w-full border border-slate-200 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400"
+        />
+      </div>
+
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-xl mb-4">{error}</div>
       )}
@@ -212,7 +222,7 @@ export default function Staff() {
           <div className="text-center text-slate-400 text-sm py-16">Cargando…</div>
         ) : filtered.length === 0 ? (
           <div className="text-center text-slate-400 text-sm py-16">
-            No hay {ROLE_LABEL[tab].toLowerCase()}s registrados.
+            {q ? 'No se encontraron resultados.' : `No hay ${ROLE_LABEL[tab].toLowerCase()}s registrados.`}
           </div>
         ) : (
           <table className="w-full text-sm">
@@ -226,7 +236,7 @@ export default function Staff() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
-              {filtered.map(u => (
+              {paged.map(u => (
                 <tr key={u.id} className="hover:bg-slate-50 transition-colors">
                   <td className="px-5 py-3 font-medium text-slate-800">{u.name}</td>
                   <td className="px-4 py-3 text-slate-500">{u.email}</td>
@@ -243,19 +253,35 @@ export default function Staff() {
                       >
                         <EditIcon />
                       </button>
-                      <button
-                        onClick={() => setDeleteId(u.id)}
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition"
-                        title="Eliminar"
-                      >
-                        <TrashIcon />
-                      </button>
                     </div>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+        )}
+
+        {/* Paginación */}
+        {!loading && filtered.length > 0 && (
+          <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100 text-sm">
+            <span className="text-slate-500">{fromRow}–{toRow} de {filtered.length}</span>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setPage(p => Math.max(p - 1, 0))}
+                disabled={page === 0}
+                className="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition"
+              >
+                Anterior
+              </button>
+              <button
+                onClick={() => setPage(p => p + 1)}
+                disabled={page + 1 >= totalPages}
+                className="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition"
+              >
+                Siguiente
+              </button>
+            </div>
+          </div>
         )}
       </div>
 
@@ -273,17 +299,6 @@ export default function Staff() {
         </Modal>
       )}
 
-      {/* Confirm delete */}
-      {deleteId && (
-        <ConfirmModal
-          title="Eliminar usuario"
-          message="¿Estás seguro? Esta acción no se puede deshacer."
-          confirmLabel="Eliminar"
-          danger
-          onConfirm={() => handleDelete(deleteId)}
-          onClose={() => setDeleteId(null)}
-        />
-      )}
     </div>
   )
 }

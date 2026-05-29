@@ -7,15 +7,13 @@ const inputClass =
   'w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition placeholder:text-slate-400'
 
 const ROLES = [
-  { value: 'medico',    label: 'Médico',    desc: 'Accede al dashboard',        color: 'blue'    },
-  { value: 'enfermero', label: 'Enfermero', desc: 'Accede al dashboard',        color: 'violet'  },
-  { value: 'admin',     label: 'Admin',     desc: 'Acceso completo al sistema', color: 'emerald' },
+  { value: 'medico',    label: 'Médico',    desc: 'Accede al dashboard', color: 'blue'   },
+  { value: 'enfermero', label: 'Enfermero', desc: 'Accede al dashboard', color: 'violet' },
 ]
 
 const roleColors = {
   blue:    { base: 'border-blue-200   bg-blue-50   text-blue-700',   active: 'border-blue-500   bg-blue-100   ring-blue-500'   },
   violet:  { base: 'border-violet-200 bg-violet-50 text-violet-700', active: 'border-violet-500 bg-violet-100 ring-violet-500' },
-  emerald: { base: 'border-emerald-200 bg-emerald-50 text-emerald-700', active: 'border-emerald-500 bg-emerald-100 ring-emerald-500' },
 }
 
 function Field({ label, hint, children }) {
@@ -80,7 +78,7 @@ export default function CreateUser() {
   }
 
   return (
-    <div className="max-w-lg">
+    <div className="max-w-2xl mx-auto">
       {/* Header */}
       <div className="flex items-center gap-3 mb-6">
         <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-slate-800 text-white flex-shrink-0">
@@ -173,7 +171,7 @@ export default function CreateUser() {
 
             {/* Rol */}
             <Field label="Rol">
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 gap-2">
                 {ROLES.map(r => {
                   const colors = roleColors[r.color]
                   const isActive = role === r.value
