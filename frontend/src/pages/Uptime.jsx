@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useAuth } from '../context/AuthContext'
-
-const API_URL = `http://${window.location.hostname}:3000`
+import { API_URL } from '../config'
 
 function UptimeIcon() {
   return (

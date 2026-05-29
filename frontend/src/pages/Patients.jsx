@@ -2,8 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import PatientForm from '../components/PatientForm'
-
-const API_URL = `http://${window.location.hostname}:3000`
+import { API_URL } from '../config'
 
 function calcAge(birthDate) {
   if (!birthDate) return null

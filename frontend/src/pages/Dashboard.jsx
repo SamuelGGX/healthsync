@@ -2,8 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { io } from 'socket.io-client'
 import { useAuth } from '../context/AuthContext'
 import BedDetailsPanel from '../components/BedDetailsPanel'
-
-const API_URL = `http://${window.location.hostname}:3000`
+import { API_URL } from '../config'
 
 const ALERT_LABELS = {
   tachycardia: 'Taquicardia',
@@ -304,7 +303,7 @@ export default function Dashboard() {
       })
       .catch(console.error)
 
-    const socket = io(`http://${window.location.hostname}:3000`, {
+    const socket = io({
       transports: ['websocket'],
       auth: { token },
     })

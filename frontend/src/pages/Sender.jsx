@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
-
-const API_URL = `http://${window.location.hostname}:3000`
+import { API_URL } from '../config'
 
 const PRESETS = [
   { key: 'normal',      label: 'Normal',      values: { bpm: 80,  spo2: 97, temperature: 36.5 }, style: 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100' },

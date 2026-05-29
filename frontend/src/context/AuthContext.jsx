@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react'
+import { API_URL } from '../config'
 
 const AuthContext = createContext(null)
-const API_URL = `http://${window.location.hostname}:3000`
 
 // Refrescamos el access token cada 20 min. Como el access vive 30 min,
 // nos quedan 10 min de margen para que nunca expire mientras el usuario navega.
