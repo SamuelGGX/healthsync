@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [ rodrigo, master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+    name: Build all Docker services
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Create dummy .env for build
+        run: |
+          cat > .env <<EOF
+          POSTGRES_USER=ci_user
+          POSTGRES_PASSWORD=ci_password
+          POSTGRES_DB=ci_db
+          BACKEND_PORT=3000
+          JWT_SECRET=ci_secret_dummy
+          CORS_ORIGIN=*
+          SIM_INTERVAL_MS=1000
+          SIMULATOR_API_KEY=ci_sim_key
+          PINGDOM_API_KEY=ci_pingdom_key
+          EOF
+
+      - name: Validate docker-compose.yml
+        run: docker compose -f docker-compose.yml config
+
+      - name: Build backend image
+        run: docker compose -f docker-compose.yml build backend
+
+      - name: Build simulator image
+        run: docker compose -f docker-compose.yml build simulator
+
+      - name: Build frontend image
+        run: docker compose -f docker-compose.yml build frontend
+
+      - name: Build munin image
+        run: docker compose -f docker-compose.yml build munin
+
+      - name: Summary
+        run: echo "Los 4 servicios compilan correctamente. db solo se descarga del registry, no se buildea."
