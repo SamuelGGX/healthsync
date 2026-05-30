@@ -53,12 +53,26 @@ services:
       - "80:80"
     depends_on:
       - backend
+      - munin
+    networks:
+      - healthsync-net
+    restart: unless-stopped
+
+  munin:
+    build: ./monitoring/munin
+    environment:
+      TZ: America/Lima
+    volumes:
+      - munindata:/var/lib/munin
+      - muninwww:/var/cache/munin/www
     networks:
       - healthsync-net
     restart: unless-stopped
 
 volumes:
   pgdata:
+  munindata:
+  muninwww:
 
 networks:
   healthsync-net:
