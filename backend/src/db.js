@@ -13,3 +13,19 @@ pool.on('error', (err) => {
 });
 
 module.exports = pool;
+
+// Espera hasta que la DB responda o agote reintentos
+async function waitForConnection(retries = 10, delayMs = 2000) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      await pool.query('SELECT 1');
+      return;
+    } catch (err) {
+      console.warn(`[DB] connection attempt ${i + 1} failed: ${err.message}`);
+      await new Promise(r => setTimeout(r, delayMs));
+    }
+  }
+  throw new Error('Could not connect to DB after multiple attempts');
+}
+
+module.exports.waitForConnection = waitForConnection;

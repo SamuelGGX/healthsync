@@ -1,0 +1,13 @@
+# Overrides solo para desarrollo local.
+# docker compose up junta automaticamente este archivo con docker-compose.yml.
+# En produccion usar: docker compose -f docker-compose.yml up --build
+# (sin -f del override) para NO publicar los puertos internos al exterior.
+
+services:
+  db:
+    ports:
+      - "5432:5432"        # acceso desde DBeaver / pgAdmin en tu PC
+
+  backend:
+    ports:
+      - "${BACKEND_PORT}:${BACKEND_PORT}"   # acceso directo desde Postman, etc.
